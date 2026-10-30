@@ -3,7 +3,7 @@ const express = require("express");
 const app = express();
 
 app.get("/", (req, res) => {
-    res.send("Welcome to study space management system");
+    res.send("SIA STUDY CAFE TEST 001");
 });
 
 app.listen(3000, () => {
