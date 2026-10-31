@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS report_snapshots (
+    snapshot_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    report_data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
