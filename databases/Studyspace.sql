@@ -16,3 +16,14 @@ CREATE TABLE users (
 );
 
 INSERT INTO roles (name) VALUES ('admin'), ('staff'), ('customer');
+
+
+CREATE TABLE pass_packages (
+    pass_package_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    hours DECIMAL(5,2) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    description TEXT,
+    validity_days INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
