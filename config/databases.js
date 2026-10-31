@@ -4,5 +4,5 @@ module.exports = mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'studyspace'
+    database: 'study_cafe_sia'
 });

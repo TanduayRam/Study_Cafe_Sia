@@ -1,5 +1,5 @@
-CREATE DATABASE studyspace;
-USE studyspace;
+CREATE DATABASE IF NOT EXISTS study_cafe_sia;
+USE study_cafe_sia;
 
 CREATE TABLE roles (
   id INT AUTO_INCREMENT PRIMARY KEY,
