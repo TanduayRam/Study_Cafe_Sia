@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Users</title>
+</head>
+
+<body>
+    <h2>Users</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
+
+    <script>
+        if (!localStorage.getItem('user')) location.href = 'login.html';
+
+        async function load() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            document.getElementById('list').innerHTML = users.map(u =>
+                `<tr>
+          <td>${u.id}</td><td>${u.name}</td><td>${u.email}</td><td>${u.role}</td>
+          <td><button onclick="del(${u.id})">Delete</button></td>
+        </tr>`
+            ).join('');
+        }
+
+        async function del(id) {
+            await fetch('/api/users/' + id, {
+                method: 'DELETE'
+            });
+            load();
+        }
+
+        load();
+    </script>
+</body>
+
+</html>
