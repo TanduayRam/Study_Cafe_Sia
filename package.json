@@ -1,5 +1,31 @@
 {
-  "dependencies": {
-    "express": "^5.3.0"
-  }
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.6",
+        "express": "^5.3.0",
+        "mysql2": "^3.9.0"
+    },
+    "name": "group_4_study_cafe.sia",
+    "version": "1.0.0",
+    "description": "Final Project",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TanduayRam/Study_Cafe_Sia.git"
+    },
+    "keywords": [
+        "sia",
+        "final",
+        "project",
+        "sy25-26"
+    ],
+    "author": "Group 4",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/TanduayRam/Study_Cafe_Sia/issues"
+    },
+    "homepage": "https://github.com/TanduayRam/Study_Cafe_Sia#readme"
 }
