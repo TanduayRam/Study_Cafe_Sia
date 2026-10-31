@@ -47,7 +47,7 @@ CREATE TABLE seats (
 INSERT INTO study_zones
 (study_zone_id, name, type, hourly_rate, max_hours, capacity)
 VALUES
-(1, 'Billiards Area', 'Game Station', 50.00, 3, 4),
+(1, 'Mini Library', 'Library', 40.00, 8, 8),
 (2, 'Open Floor', 'Open Floor', 40.00, 8, 20),
 (3, 'Quiet Zone', 'Quiet Zone', 60.00, 8, 15),
 (4, 'Private Room', 'Private Room', 150.00, 8, 5),
@@ -56,18 +56,31 @@ VALUES
 
 INSERT INTO seats (study_zone_id, label, status)
 VALUES
-(1, 'Billiards Table 1', 'Available'),
-(1, 'Billiards Table 2', 'Available'),
+(1, 'Library Desk 1', 'Available'),
+(1, 'Library Desk 2', 'Available'),
+(1, 'Library Reading Seat 1', 'Available'),
+(1, 'Library Reading Seat 2', 'Available'),
 (2, 'Desk 1', 'Available'),
 (2, 'Desk 2', 'Available'),
+(2, 'Desk 3', 'Available'),
+(2, 'Desk 4', 'Available'),
+(2, 'Group Study Table 1', 'Available'),
+(2, 'Group Study Table 2', 'Available'),
 (3, 'Quiet Seat 1', 'Available'),
 (3, 'Quiet Seat 2', 'Available'),
+(3, 'Quiet Seat 3', 'Available'),
+(3, 'Quiet Seat 4', 'Available'),
+(3, 'Quiet Seat 5', 'Available'),
 (4, 'Private Room 1', 'Available'),
+(4, 'Private Room 2', 'Available'),
+(4, 'Private Room 3', 'Available'),
 (5, 'Chess Board 1', 'Available'),
 (5, 'Chess Board 2', 'Available'),
 (6, 'Booth 1', 'Available'),
 (6, 'Booth 2', 'Available'),
-(6, 'Booth 3', 'Available');
+(6, 'Booth 3', 'Available'),
+(6, 'Booth 4', 'Available'),
+(6, 'Booth 5', 'Available');
 
 INSERT INTO menu_items
 (name, category, price, stock, reorder_level)
@@ -83,7 +96,7 @@ VALUES
 ('Blue Ballpen', 'Study Supplies', 15.00, 50, 10),
 ('Yellow Pad Paper', 'Study Supplies', 35.00, 30, 5),
 ('Yellow Highlighter', 'Study Supplies', 25.00, 30, 5),
-('Sticky Notes', 'Study Supplies', 40.00, 20, 5)
+('Sticky Notes', 'Study Supplies', 40.00, 20, 5),
 ('Mechanical Pencil', 'Study Supplies', 45.00, 20, 5),
 ('Pencil Leads 0.5mm', 'Study Supplies', 30.00, 20, 5),
 ('Correction Tape', 'Study Supplies', 35.00, 20, 5),
