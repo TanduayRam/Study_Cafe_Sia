@@ -15,6 +15,7 @@ app.use('/api/session-logs', require('./routes/session_logs_routes'));
 app.use('/api/alerts', require('./routes/alerts_routes'));
 app.use('/api/engine', require('./routes/engine_routes'));
 app.use('/api/audit-logs', require('./routes/audit_logs_routes'));
+app.use('/api/no-show', require('./routes/no_show_routes'));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'frontend', 'user.html'));
