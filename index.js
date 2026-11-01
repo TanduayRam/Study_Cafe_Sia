@@ -6,7 +6,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'C:\\Users\\hi\\OneDrive - DEPED REGION 7-1\\Desktop\\SIA CAFE\\frontend')));
+app.use(express.static(path.join(__dirname, 'frontend')));
 
 
 app.use('/api/auth', require('./routes/auth_routes'));
