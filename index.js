@@ -15,6 +15,8 @@ app.use('/api/users', require('./routes/user_routes'));
 app.use('/api/study-zones', require('./routes/studyZoneRoutes'));
 app.use('/api/seats', require('./routes/seatRoutes'));
 app.use('/api/menu-items', require('./routes/menuItemRoutes'));
+app.use('/api/reservations', require('./routes/reservationRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 
 app.get('/test', (req, res) => {
     res.send('Express is working!');
