@@ -2,6 +2,8 @@ const reservationModel = require('../models/reservationModel');
 const seatModel = require('../models/seatModel');
 const studyZoneModel = require('../models/studyZoneModel');
 const db = require('../config/databases');
+const billingModel = require('../models/billing_model');
+const paymentModel = require('../models/payment_model');
 
 // Get all reservations
 const getAll = async (req, res) => {
