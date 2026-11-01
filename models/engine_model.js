@@ -1,5 +1,6 @@
 
 const db = require('../config/databases');
+const logAction = require('../utils/audit_logger');
 
 const SYSTEM_USER_ID = 7;
 
@@ -26,16 +27,13 @@ async function createAlert(connection, alertType, message) {
         [SYSTEM_USER_ID, message, alertType]
     );
 
-    await connection.query(
-        `INSERT INTO audit_logs
-         (user_id, action, table_name, record_id, description)
-         VALUES (?, 'CREATE', 'alerts', ?, ?)`,
-        [
-            SYSTEM_USER_ID,
-            result.insertId,
-            `System automatically created a ${alertType} alert: ${message}`
-        ]
-    );
+    await logAction({
+        userId: SYSTEM_USER_ID,
+        action: 'CREATE',
+        tableName: 'alerts',
+        recordId: result.insertId,
+        description: `System automatically created a ${alertType} alert: ${message}`
+    }, connection);
 
     return result.insertId;
 }

@@ -1,5 +1,6 @@
 
 const db = require('../config/databases');
+const logAction = require('../utils/audit_logger');
 
 const SYSTEM_USER_ID = 7;
 
@@ -90,17 +91,13 @@ async function updateStatus(id, newStatus, action) {
                 [newStatus, id]
             );
 
-            await connection.query(
-                `INSERT INTO audit_logs
-                (user_id, action, table_name, record_id, description)
-                VALUES (?, ?, 'alerts', ?, ?)`,
-                [
-                    SYSTEM_USER_ID,
-                    action,
-                    id,
-                    `System changed alert ${id} status from ${oldStatus} to ${newStatus}.`
-                ]
-            );
+            await logAction({
+                userId: SYSTEM_USER_ID,
+                action,
+                tableName: 'alerts',
+                recordId: id,
+                description: `System changed alert ${id} status from ${oldStatus} to ${newStatus}.`
+            }, connection);
         }
 
         await connection.commit();

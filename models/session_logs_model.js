@@ -1,4 +1,6 @@
+
 const db = require('../config/databases');
+const logAction = require('../utils/audit_logger');
 
 const SYSTEM_USER_ID = 7;
 
@@ -63,16 +65,13 @@ exports.create = async (
             ]
         );
 
-        await connection.query(
-            `INSERT INTO audit_logs
-             (user_id, action, table_name, record_id, description)
-             VALUES (?, 'CHECKIN', 'session_logs', ?, ?)`,
-            [
-                SYSTEM_USER_ID,
-                result.insertId,
-                `Session ${result.insertId} was checked in. User ID: ${userId}.`
-            ]
-        );
+        await logAction({
+            userId: SYSTEM_USER_ID,
+            action: 'CHECKIN',
+            tableName: 'session_logs',
+            recordId: result.insertId,
+            description: `Session ${result.insertId} was checked in. User ID: ${userId}.`
+        }, connection);
 
         await connection.commit();
         return result.insertId;
@@ -104,16 +103,13 @@ exports.update = async (id, endTime, status) => {
             return false;
         }
 
-        await connection.query(
-            `INSERT INTO audit_logs
-             (user_id, action, table_name, record_id, description)
-             VALUES (?, 'CHECKOUT', 'session_logs', ?, ?)`,
-            [
-                SYSTEM_USER_ID,
-                id,
-                `Session ${id} was checked out. Status: ${status}.`
-            ]
-        );
+        await logAction({
+            userId: SYSTEM_USER_ID,
+            action: 'CHECKOUT',
+            tableName: 'session_logs',
+            recordId: id,
+            description: `Session ${id} was checked out. Status: ${status}.`
+        }, connection);
 
         await connection.commit();
         return true;
