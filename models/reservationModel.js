@@ -1,10 +1,23 @@
 const db = require('../config/databases');
 
-// Get all reservations
+// Get all reservations with member, seat, and study zone details
 const getAll = async () => {
     const [rows] = await db.query(
-        'SELECT * FROM reservations'
+        `SELECT
+            r.*,
+            u.name AS member_name,
+            s.label AS seat_label,
+            sz.name AS zone_name
+        FROM reservations r
+        INNER JOIN users u
+            ON r.user_id = u.id
+        INNER JOIN seats s
+            ON r.seat_id = s.seat_id
+        INNER JOIN study_zones sz
+            ON s.study_zone_id = sz.study_zone_id
+        ORDER BY r.reservation_id DESC`
     );
+
     return rows;
 };
 

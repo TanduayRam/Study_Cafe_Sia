@@ -92,6 +92,12 @@ const create = async (req, res) => {
                 message: 'Seat not found.'
             });
         }
+// Check whether the seat is available
+if (seat.status !== 'Available') {
+    return res.status(400).json({
+        message: 'This seat is not available.'
+    });
+}
 
         // Get the seat's study zone
         const zone = await studyZoneModel.getById(seat.study_zone_id);
@@ -206,6 +212,12 @@ const update = async (req, res) => {
             });
         }
 
+        // Check whether the seat is available
+if (seat.status !== 'Available') {
+    return res.status(400).json({
+        message: 'This seat is not available.'
+    });
+}
         // Get the seat's study zone
         const zone = await studyZoneModel.getById(seat.study_zone_id);
 
