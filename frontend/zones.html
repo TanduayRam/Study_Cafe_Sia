@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Study Spaces</title>
+</head>
+<body>
+    <h2>Find Your Focus</h2>
+    <h3>Create a Space</h3>
+
+<form id="zoneForm">
+    <input id="name" placeholder="Zone Name" required>
+    <input id="type" placeholder="Zone Type" required>
+    <input id="hourly_rate" type="number" step="0.01" placeholder="Hourly Rate" required>
+    <input id="max_hours" type="number" placeholder="Maximum Hours" required>
+    <input id="capacity" type="number" placeholder="Capacity" required>
+    <button type="submit">Save Space</button>
+</form>
+
+    <p id="status">Preparing your study spaces...</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Hourly Rate</th>
+                <th>Max Hours</th>
+                <th>Capacity</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
+
+    <script>
+        
+let editingZoneId = null;
+
+async function loadZones() {
+    const status = document.getElementById('status');
+    const list = document.getElementById('list');
+
+    status.textContent = 'Getting your spaces ready...';
+
+    try {
+        const res = await fetch('/api/study-zones');
+
+        if (!res.ok) {
+            throw new Error('Unable to prepare your study spaces.');
+        }
+
+        const zones = await res.json();
+
+        list.innerHTML = zones.map(zone => `
+            <tr>
+                <td>${zone.study_zone_id}</td>
+                <td>${zone.name}</td>
+                <td>${zone.type}</td>
+                <td>${zone.hourly_rate}</td>
+                <td>${zone.max_hours}</td>
+                <td>${zone.capacity}</td>
+                <td>
+    <button onclick="editZone(${zone.study_zone_id})">Edit</button>
+    <button onclick="deleteZone(${zone.study_zone_id})">Delete</button>
+</td>
+            </tr>
+        `).join('');
+
+        status.textContent = 'Your study spaces are ready!';
+    } catch (error) {
+        status.textContent = error.message;
+    }
+}
+
+async function editZone(id) {
+    try {
+        const res = await fetch('/api/study-zones/' + id);
+
+        if (!res.ok) {
+            throw new Error('Failed to load study zone.');
+        }
+
+        const zone = await res.json();
+
+        document.getElementById('name').value = zone.name;
+        document.getElementById('type').value = zone.type;
+        document.getElementById('hourly_rate').value = zone.hourly_rate;
+        document.getElementById('max_hours').value = zone.max_hours;
+        document.getElementById('capacity').value = zone.capacity;
+
+        editingZoneId = id;
+        document.querySelector('#zoneForm button[type="submit"]').textContent = 'Save Changes';
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function deleteZone(id) {
+    const confirmDelete = confirm('Remove this space from your list?');
+
+    if (!confirmDelete) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/study-zones/' + id, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || 'Failed to delete study zone.');
+        }
+
+        alert('Space removed successfully!');
+        loadZones();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+document.getElementById('zoneForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    const zone = {
+        name: document.getElementById('name').value,
+        type: document.getElementById('type').value,
+        hourly_rate: document.getElementById('hourly_rate').value,
+        max_hours: document.getElementById('max_hours').value,
+        capacity: document.getElementById('capacity').value
+    };
+
+    const url = editingZoneId
+        ? '/api/study-zones/' + editingZoneId
+        : '/api/study-zones';
+
+    const method = editingZoneId ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(zone)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || 'Unable to save your changes.');
+        }
+
+        alert(editingZoneId
+    ? 'Your changes have been saved!'
+    : 'Your new space is ready!');
+
+        editingZoneId = null;
+        document.getElementById('zoneForm').reset();
+        document.querySelector('#zoneForm button[type="submit"]').textContent = 'Save Space';
+
+        loadZones();
+
+    } catch (error) {
+        alert(error.message);
+    }
+});
+
+loadZones();
+
+    </script>
+</body>
+</html>
