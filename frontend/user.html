@@ -1,12 +1,15 @@
+```html
 <!DOCTYPE html>
 <html>
 
 <head>
-    <title>Users</title>
+    <title>Study Cafe Dashboard</title>
 </head>
 
 <body>
+
     <h2>Users</h2>
+
     <table border="1">
         <thead>
             <tr>
@@ -14,35 +17,272 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
-                <th></th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody id="list"></tbody>
     </table>
 
+    <h2>Study Cafe Monitoring Engine</h2>
+
+    <button onclick="runMonitoringEngine()">
+        Run Monitoring Checks
+    </button>
+
+    <p id="engineMessage"></p>
+
+    <h2>Study Cafe Alerts</h2>
+
+    <label for="statusFilter">Filter by Status:</label>
+
+    <select id="statusFilter" onchange="loadAlerts()">
+        <option value="All">All Statuses</option>
+        <option value="Open">Open</option>
+        <option value="Acknowledged">Acknowledged</option>
+        <option value="Resolved">Resolved</option>
+    </select>
+
+    <br><br>
+
+    <label for="typeFilter">Filter by Type:</label>
+
+    <select id="typeFilter" onchange="loadAlerts()">
+        <option value="All">All Types</option>
+        <option value="Capacity">Capacity</option>
+        <option value="Overstay">Overstay</option>
+        <option value="Low Stock">Low Stock</option>
+        <option value="System">System</option>
+    </select>
+
+    <br><br>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Alert ID</th>
+                <th>User</th>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="alertsList"></tbody>
+    </table>
+
+    <h2>Study Cafe Session Logs</h2>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Session ID</th>
+                <th>User</th>
+                <th>Study Zone</th>
+                <th>Start Time</th>
+                <th>Expected End Time</th>
+                <th>End Time</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="sessionsList"></tbody>
+    </table>
+
+    <h2>Study Cafe Audit Logs</h2>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Audit ID</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Table Name</th>
+                <th>Record ID</th>
+                <th>Description</th>
+                <th>Date Created</th>
+            </tr>
+        </thead>
+        <tbody id="auditLogsList"></tbody>
+    </table>
+
     <script>
-        if (!localStorage.getItem('user')) location.href = 'login.html';
+
+        if (!localStorage.getItem('user')) {
+            location.href = 'login.html';
+        }
 
         async function load() {
             const res = await fetch('/api/users');
             const users = await res.json();
-            document.getElementById('list').innerHTML = users.map(u =>
-                `<tr>
-          <td>${u.id}</td><td>${u.name}</td><td>${u.email}</td><td>${u.role}</td>
-          <td><button onclick="del(${u.id})">Delete</button></td>
-        </tr>`
-            ).join('');
+
+            document.getElementById('list').innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.id}</td>
+                    <td>${u.name}</td>
+                    <td>${u.email}</td>
+                    <td>${u.role}</td>
+                    <td>
+                        <button onclick="del(${u.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
         }
 
         async function del(id) {
             await fetch('/api/users/' + id, {
                 method: 'DELETE'
             });
+
             load();
         }
 
+        async function loadAlerts() {
+            const status = document.getElementById('statusFilter').value;
+            const type = document.getElementById('typeFilter').value;
+
+            const params = new URLSearchParams();
+
+            if (status !== 'All') {
+                params.append('status', status);
+            }
+
+            if (type !== 'All') {
+                params.append('type', type);
+            }
+
+            const res = await fetch('/api/alerts?' + params.toString());
+            const alerts = await res.json();
+
+            document.getElementById('alertsList').innerHTML = alerts.map(a => `
+                <tr>
+                    <td>${a.alert_id}</td>
+                    <td>${a.user_name}</td>
+                    <td>${a.message}</td>
+                    <td>${a.alert_type}</td>
+                    <td>${a.status} (${a.is_read ? 'Read' : 'Unread'})</td>
+                    <td>
+                        <button onclick="markRead(${a.alert_id})">
+                            Mark as Read
+                        </button>
+
+                        <button onclick="acknowledgeAlert(${a.alert_id})">
+                            Acknowledge
+                        </button>
+
+                        <button onclick="resolveAlert(${a.alert_id})">
+                            Resolve
+                        </button>
+
+                        <button onclick="deleteAlert(${a.alert_id})">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function markRead(id) {
+            await fetch('/api/alerts/' + id + '/read', {
+                method: 'PATCH'
+            });
+
+            loadAlerts();
+        }
+
+        async function acknowledgeAlert(id) {
+            await fetch('/api/alerts/' + id + '/acknowledge', {
+                method: 'PATCH'
+            });
+
+            loadAlerts();
+            loadAuditLogs();
+        }
+
+        async function resolveAlert(id) {
+            await fetch('/api/alerts/' + id + '/resolve', {
+                method: 'PATCH'
+            });
+
+            loadAlerts();
+            loadAuditLogs();
+        }
+
+        async function deleteAlert(id) {
+            await fetch('/api/alerts/' + id, {
+                method: 'DELETE'
+            });
+
+            loadAlerts();
+        }
+
+        async function loadSessions() {
+            const res = await fetch('/api/session-logs');
+            const sessions = await res.json();
+
+            document.getElementById('sessionsList').innerHTML = sessions.map(s => `
+                <tr>
+                    <td>${s.session_log_id}</td>
+                    <td>${s.user_name}</td>
+                    <td>${s.study_zone}</td>
+                    <td>${s.start_time || 'Not set'}</td>
+                    <td>${s.expected_end_time || 'Not set'}</td>
+                    <td>${s.end_time || 'Not finished'}</td>
+                    <td>${s.status}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadAuditLogs() {
+            const res = await fetch('/api/audit-logs');
+            const logs = await res.json();
+
+            document.getElementById('auditLogsList').innerHTML = logs.map(a => `
+                <tr>
+                    <td>${a.audit_log_id}</td>
+                    <td>${a.user_name || 'Unknown'}</td>
+                    <td>${a.action}</td>
+                    <td>${a.table_name}</td>
+                    <td>${a.record_id}</td>
+                    <td>${a.description || ''}</td>
+                    <td>${a.created_at}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function runMonitoringEngine() {
+            const message = document.getElementById('engineMessage');
+
+            try {
+                message.textContent = 'Checking study cafe...';
+
+                const res = await fetch('/api/engine/check', {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Engine failed.');
+                }
+
+                message.textContent =
+                    `Monitoring completed! Capacity alerts: ${data.capacityAlerts}, Overstay alerts: ${data.overstayAlerts}, Low-stock alerts: ${data.stockAlerts}`;
+
+                loadAlerts();
+                loadAuditLogs();
+
+            } catch (error) {
+                message.textContent = 'Error: ' + error.message;
+            }
+        }
+
         load();
+        loadAlerts();
+        loadSessions();
+        loadAuditLogs();
+
     </script>
+
 </body>
 
 </html>
+```
