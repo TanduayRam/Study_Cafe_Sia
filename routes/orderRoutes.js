@@ -11,5 +11,7 @@ router.get('/:id', orderController.getById);
 
 // Create an order
 router.post('/', orderController.create);
+// Update order status
+router.patch('/:id/status', orderController.updateStatus);
 
 module.exports = router;
