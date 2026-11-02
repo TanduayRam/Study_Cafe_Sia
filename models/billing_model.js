@@ -138,13 +138,14 @@ FOR UPDATE`,
 
     // Get all order totals for this reservation
     const [orders] = await connection.query(
-        `SELECT COALESCE(SUM(total_amount), 0) AS orders_total
-         FROM orders
-         WHERE reservation_id = ?`,
-        [reservationId]
-    );
+    `SELECT COALESCE(SUM(total_amount), 0) AS orders_total
+     FROM orders
+     WHERE reservation_id = ?
+     AND status = 'Served'`,
+    [reservationId]
+);
 
-    const ordersTotal = roundMoney(Number(orders[0].orders_total));
+const ordersTotal = roundMoney(Number(orders[0].orders_total));
 
     // Calculate peak-hour overlap (4 PM to 8 PM)
     let peakHours = 0;
