@@ -27,3 +27,31 @@ CREATE TABLE pass_packages (
     validity_days INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id INT NOT NULL,
+    pass_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    cash_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total_amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(30) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Paid',
+    void_reason TEXT,
+    paid_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_payments_reservation
+        FOREIGN KEY (reservation_id)
+        REFERENCES reservations(reservation_id),
+
+    CONSTRAINT uq_payment_reservation
+        UNIQUE (reservation_id),
+
+    CONSTRAINT chk_payment_amounts
+        CHECK (
+            pass_amount >= 0
+            AND cash_amount >= 0
+            AND total_amount >= 0
+        )
+);
