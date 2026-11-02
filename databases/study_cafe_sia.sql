@@ -112,3 +112,74 @@ VALUES
 ('Scientific Calculator', 'Study Supplies', 350.00, 5, 1),
 ('Flash Cards', 'Study Supplies', 45.00, 20, 5),
 ('Book Tabs', 'Study Supplies', 25.00, 20, 5);
+
+
+-- =========================================
+-- RESERVATIONS TABLE
+-- Member C: Malingin
+-- =========================================
+
+CREATE TABLE reservations (
+    reservation_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    seat_id INT NOT NULL,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Confirmed',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_reservations_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id),
+
+    CONSTRAINT fk_reservations_seat
+        FOREIGN KEY (seat_id)
+        REFERENCES seats(seat_id),
+
+    CONSTRAINT chk_reservation_time
+        CHECK (end_time > start_time),
+
+    INDEX idx_reservations_seat (seat_id),
+    INDEX idx_reservations_user (user_id),
+    INDEX idx_reservations_status (status)
+);
+
+-- Orders table
+CREATE TABLE orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id INT NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_orders_reservation
+        FOREIGN KEY (reservation_id)
+        REFERENCES reservations(reservation_id),
+
+    CONSTRAINT chk_order_total
+        CHECK (total_amount >= 0)
+);
+
+-- Order items table
+CREATE TABLE order_items (
+    order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    menu_item_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+
+    CONSTRAINT fk_order_items_order
+        FOREIGN KEY (order_id)
+        REFERENCES orders(order_id),
+
+    CONSTRAINT fk_order_items_menu
+        FOREIGN KEY (menu_item_id)
+        REFERENCES menu_items(menu_item_id),
+
+    CONSTRAINT chk_order_item_quantity
+        CHECK (quantity > 0),
+
+    CONSTRAINT chk_order_item_price
+        CHECK (unit_price >= 0 AND subtotal >= 0)
+);
