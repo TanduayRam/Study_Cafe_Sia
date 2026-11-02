@@ -2,6 +2,7 @@ const db = require('../config/databases');
 const billingModel = require('./billing_model');
 const paymentModel = require('./payment_model');
 
+
 // Process checkout in one database transaction.
 async function checkoutReservation(
     reservationId,
@@ -75,6 +76,7 @@ async function checkoutReservation(
             [reservationId]
         );
 
+
         // Release the seat.
         await connection.query(
             `UPDATE seats
@@ -82,6 +84,7 @@ async function checkoutReservation(
              WHERE seat_id = ?`,
             [reservation.seat_id]
         );
+
 
         await connection.commit();
 

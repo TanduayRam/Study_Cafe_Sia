@@ -1,5 +1,6 @@
 const db = require('../config/databases');
 
+
 // Create a payment
 async function create(paymentData, connection = db) {
     const {
@@ -46,16 +47,37 @@ async function getAll() {
     return rows;
 }
 
-// Void a payment
+// Void a payment.
 async function voidPayment(id, reason) {
-    const [result] = await db.query(
-        `UPDATE payments
-         SET status = 'Voided', void_reason = ?
-         WHERE payment_id = ? AND status = 'Paid'`,
-        [reason, id]
-    );
+    const connection = await db.getConnection();
 
-    return result.affectedRows > 0;
+    try {
+        await connection.beginTransaction();
+
+        const [result] = await connection.query(
+            `UPDATE payments
+             SET status = 'Voided', void_reason = ?
+             WHERE payment_id = ? AND status = 'Paid'`,
+            [reason, id]
+        );
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return false;
+        }
+
+
+        await connection.commit();
+
+        return true;
+
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+
+    } finally {
+        connection.release();
+    }
 }
 
 module.exports = {

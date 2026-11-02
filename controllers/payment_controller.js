@@ -5,13 +5,14 @@ exports.getAll = async (req, res) => {
     try {
         const payments = await Payment.getAll();
 
-        res.json({
+        return res.status(200).json({
             success: true,
             data: payments
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({
+        console.error('Get payments error:', error);
+
+        return res.status(500).json({
             success: false,
             message: 'Failed to retrieve payments.'
         });
@@ -39,13 +40,14 @@ exports.getById = async (req, res) => {
             });
         }
 
-        res.json({
+        return res.status(200).json({
             success: true,
             data: payment
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({
+        console.error('Get payment error:', error);
+
+        return res.status(500).json({
             success: false,
             message: 'Failed to retrieve payment.'
         });
@@ -56,7 +58,7 @@ exports.getById = async (req, res) => {
 exports.voidPayment = async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const { reason } = req.body;
+        const { reason } = req.body || {};
 
         if (!Number.isInteger(id) || id <= 0) {
             return res.status(400).json({
@@ -65,10 +67,13 @@ exports.voidPayment = async (req, res) => {
             });
         }
 
-        if (!reason || !reason.trim()) {
+        if (
+            typeof reason !== 'string' ||
+            !reason.trim()
+        ) {
             return res.status(400).json({
                 success: false,
-                message: 'A void reason is required.'
+                message: 'A valid void reason is required.'
             });
         }
 
@@ -81,13 +86,15 @@ exports.voidPayment = async (req, res) => {
             });
         }
 
-        res.json({
+        return res.status(200).json({
             success: true,
             message: 'Payment voided successfully.'
         });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({
+        console.error('Void payment error:', error);
+
+        return res.status(500).json({
             success: false,
             message: 'Failed to void payment.'
         });

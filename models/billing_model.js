@@ -52,12 +52,6 @@ async function computeBill(
     const startTime = new Date(reservation.start_time);
     const endTime = new Date(reservation.end_time);
 
-    console.log('Database start time:', reservation.start_time);
-    console.log('Database end time:', reservation.end_time);
-    console.log('Parsed start time:', startTime);
-    console.log('Parsed end time:', endTime);
-    console.log('Checkout time:', actualCheckoutTime);
-
     if (
         isNaN(startTime.getTime()) ||
         isNaN(endTime.getTime()) ||
@@ -95,14 +89,14 @@ async function computeBill(
                AND remaining_hours > 0
                AND expires_on >= CURDATE()
              ORDER BY expires_on ASC, member_pass_id ASC
-FOR UPDATE`,
+             FOR UPDATE`,
             [reservation.user_id]
         );
 
         memberPasses = passes;
     }
 
-    // Calculate pass usage and cash hours
+    // Calculate pass usage and remaining cash hours
     let passHoursUsed = 0;
     let cashHours = sessionHours;
     const passDeductions = [];
@@ -129,23 +123,25 @@ FOR UPDATE`,
         });
     }
 
-    // Calculate session amounts
+    // Calculate regular session amounts
     passHoursUsed = Number(passHoursUsed.toFixed(2));
     cashHours = Number(cashHours.toFixed(2));
 
     const passAmount = roundMoney(passHoursUsed * hourlyRate);
-    const cashAmount = roundMoney(cashHours * hourlyRate);
 
-    // Get all order totals for this reservation
+    // Keep regular cash session amount separate
+    const cashSessionAmount = roundMoney(cashHours * hourlyRate);
+
+    // Get served order totals for this reservation
     const [orders] = await connection.query(
-    `SELECT COALESCE(SUM(total_amount), 0) AS orders_total
-     FROM orders
-     WHERE reservation_id = ?
-     AND status = 'Served'`,
-    [reservationId]
-);
+        `SELECT COALESCE(SUM(total_amount), 0) AS orders_total
+         FROM orders
+         WHERE reservation_id = ?
+           AND status = 'Served'`,
+        [reservationId]
+    );
 
-const ordersTotal = roundMoney(Number(orders[0].orders_total));
+    const ordersTotal = roundMoney(Number(orders[0].orders_total));
 
     // Calculate peak-hour overlap (4 PM to 8 PM)
     let peakHours = 0;
@@ -198,13 +194,17 @@ const ordersTotal = roundMoney(Number(orders[0].orders_total));
         overtimePeriods * (hourlyRate / 2)
     );
 
-    // Calculate final amount
-    const totalAmount = roundMoney(
-        passAmount +
-        cashAmount +
+    // Calculate total cash charges
+    const cashAmount = roundMoney(
+        cashSessionAmount +
         peakSurcharge +
         overtimeAmount +
         ordersTotal
+    );
+
+    // Calculate final amount
+    const totalAmount = roundMoney(
+        passAmount + cashAmount
     );
 
     // Return billing breakdown
@@ -216,6 +216,7 @@ const ordersTotal = roundMoney(Number(orders[0].orders_total));
         pass_deductions: passDeductions,
         cash_hours: cashHours,
         pass_amount: passAmount,
+        cash_session_amount: cashSessionAmount,
         cash_amount: cashAmount,
         peak_hours: Number(peakHours.toFixed(2)),
         peak_surcharge: peakSurcharge,
