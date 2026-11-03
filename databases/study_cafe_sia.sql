@@ -1,22 +1,55 @@
 CREATE DATABASE IF NOT EXISTS study_cafe_sia;
 USE study_cafe_sia;
 
+-- ROLES TABLE
 CREATE TABLE roles (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(30) UNIQUE NOT NULL
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(30) UNIQUE NOT NULL
 );
 
+-- USERS TABLE
 CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(100) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  role_id INT NOT NULL,
-  FOREIGN KEY (role_id) REFERENCES roles(id)
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role_id INT NOT NULL,
+    FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
-INSERT INTO roles (name) VALUES ('admin'), ('staff'), ('customer');
+INSERT INTO roles (name)
+VALUES ('admin'), ('staff'), ('customer');
 
+
+-- =========================================
+-- MEMBER D: PASS PACKAGES AND MEMBER PASSES
+-- =========================================
+
+CREATE TABLE pass_packages (
+    pass_package_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    hours DECIMAL(5,2) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    description TEXT,
+    validity_days INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE member_passes (
+    member_pass_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    pass_package_id INT NOT NULL,
+    remaining_hours DECIMAL(5,2) NOT NULL,
+    expires_on DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (pass_package_id)
+        REFERENCES pass_packages(pass_package_id)
+);
+
+
+-- STUDY ZONES TABLE
 CREATE TABLE study_zones (
     study_zone_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
@@ -25,6 +58,9 @@ CREATE TABLE study_zones (
     max_hours INT NOT NULL,
     capacity INT NOT NULL
 );
+
+
+-- MENU ITEMS TABLE
 CREATE TABLE menu_items (
     menu_item_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -33,17 +69,25 @@ CREATE TABLE menu_items (
     stock INT NOT NULL,
     reorder_level INT NOT NULL
 );
+
+
+-- SEATS TABLE
 CREATE TABLE seats (
     seat_id INT AUTO_INCREMENT PRIMARY KEY,
     study_zone_id INT NOT NULL,
     label VARCHAR(50) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'Available',
+
     CONSTRAINT uq_seats_zone_label
         UNIQUE (study_zone_id, label),
+
     CONSTRAINT fk_seats_zone
         FOREIGN KEY (study_zone_id)
         REFERENCES study_zones(study_zone_id)
 );
+
+
+-- STUDY ZONES SAMPLE DATA
 INSERT INTO study_zones
 (study_zone_id, name, type, hourly_rate, max_hours, capacity)
 VALUES
@@ -54,6 +98,8 @@ VALUES
 (5, 'Game Station', 'Game Station', 80.00, 2, 4),
 (6, 'Solitude Wall', 'Solitude Wall', 100.00, 4, 10);
 
+
+-- SEATS SAMPLE DATA
 INSERT INTO seats (study_zone_id, label, status)
 VALUES
 (1, 'Library Desk 1', 'Available'),
@@ -82,6 +128,8 @@ VALUES
 (6, 'Booth 4', 'Available'),
 (6, 'Booth 5', 'Available');
 
+
+-- MENU ITEMS SAMPLE DATA
 INSERT INTO menu_items
 (name, category, price, stock, reorder_level)
 VALUES
@@ -144,7 +192,40 @@ CREATE TABLE reservations (
     INDEX idx_reservations_status (status)
 );
 
--- Orders table
+
+-- =========================================
+-- MEMBER D: PAYMENTS
+-- =========================================
+
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id INT NOT NULL,
+    pass_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    cash_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total_amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(30) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Paid',
+    void_reason TEXT,
+    paid_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_payments_reservation
+        FOREIGN KEY (reservation_id)
+        REFERENCES reservations(reservation_id),
+
+    CONSTRAINT uq_payment_reservation
+        UNIQUE (reservation_id),
+
+    CONSTRAINT chk_payment_amounts
+        CHECK (
+            pass_amount >= 0
+            AND cash_amount >= 0
+            AND total_amount >= 0
+        )
+);
+
+
+-- ORDERS TABLE
 CREATE TABLE orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     reservation_id INT NOT NULL,
@@ -160,7 +241,8 @@ CREATE TABLE orders (
         CHECK (total_amount >= 0)
 );
 
--- Order items table
+
+-- ORDER ITEMS TABLE
 CREATE TABLE order_items (
     order_item_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
