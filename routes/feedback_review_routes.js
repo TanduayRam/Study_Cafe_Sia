@@ -6,9 +6,9 @@ const reviewController = require('../controllers/feedback_review_controller');
 
 router.post('/', reviewController.createReview);
 
-router.get('/', reviewController.getAllReviews);
+router.get('/', reviewController.getReviews);
 
-router.get('/:id', reviewController.getReviewById);
+router.get('/:id', reviewController.getReview);
 
 router.put('/:id', reviewController.updateReview);
 
