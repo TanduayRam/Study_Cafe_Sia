@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payments</title>
+</head>
+<body>
+    <h2>Payment Records</h2>
+
+    <p id="status">Loading payment records...</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Payment ID</th>
+                <th>Reservation ID</th>
+                <th>Pass Amount</th>
+                <th>Cash Amount</th>
+                <th>Total Amount</th>
+                <th>Payment Method</th>
+                <th>Status</th>
+                <th>Paid At</th>
+                <th>Void Reason</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="paymentList"></tbody>
+    </table>
+
+    <script>
+        async function loadPayments() {
+            const status = document.getElementById('status');
+            const list = document.getElementById('paymentList');
+
+            status.textContent = 'Loading payment records...';
+
+            try {
+                const res = await fetch('/api/payments');
+
+                if (!res.ok) {
+                    throw new Error('Failed to retrieve payment records.');
+                }
+
+                const response = await res.json();
+                const payments = response.data;
+
+                list.innerHTML = payments.map(payment => `
+                    <tr>
+                        <td>${payment.payment_id}</td>
+                        <td>${payment.reservation_id}</td>
+                        <td>₱${Number(payment.pass_amount).toFixed(2)}</td>
+                        <td>₱${Number(payment.cash_amount).toFixed(2)}</td>
+                        <td>₱${Number(payment.total_amount).toFixed(2)}</td>
+                        <td>${payment.payment_method}</td>
+                        <td>${payment.status}</td>
+                        <td>${payment.paid_at || ''}</td>
+                        <td>${payment.void_reason || ''}</td>
+                        <td>
+                            ${payment.status === 'Paid'
+                                ? `<button onclick="voidPayment(${payment.payment_id})">Void</button>`
+                                : 'No action'}
+                        </td>
+                    </tr>
+                `).join('');
+
+                status.textContent = 'Payment records loaded successfully!';
+
+            } catch (error) {
+                status.textContent = error.message;
+            }
+        }
+
+        async function voidPayment(id) {
+            const reason = prompt('Enter the reason for voiding this payment:');
+
+            if (reason === null) {
+                return;
+            }
+
+            if (!reason.trim()) {
+                alert('A void reason is required.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to void this payment?')) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/payments/' + id + '/void', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reason: reason.trim()
+                    })
+                });
+
+                const response = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(response.message || 'Failed to void payment.');
+                }
+
+                alert('Payment voided successfully!');
+                loadPayments();
+
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        loadPayments();
+    </script>
+</body>
+</html>
