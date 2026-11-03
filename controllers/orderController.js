@@ -194,8 +194,50 @@ const create = async (req, res) => {
     }
 };
 
+// Update order status
+const updateStatus = async (req, res) => {
+    const { status } = req.body;
+    const orderId = Number(req.params.id);
+
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+        return res.status(400).json({
+            message: 'Invalid order ID.'
+        });
+    }
+
+    if (!['Served', 'Cancelled'].includes(status)) {
+        return res.status(400).json({
+            message: 'Status must be Served or Cancelled.'
+        });
+    }
+
+    try {
+        const order = await orderModel.getById(orderId);
+
+        if (!order) {
+            return res.status(404).json({
+                message: 'Order not found.'
+            });
+        }
+
+        await orderModel.updateStatus(orderId, status);
+
+        res.status(200).json({
+            message: 'Order status updated successfully.',
+            order_id: orderId,
+            status
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     getAll,
     getById,
-    create
+    create,
+    updateStatus
 };
