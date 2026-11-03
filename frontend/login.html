@@ -27,7 +27,7 @@
             const data = await res.json();
             if (res.ok) {
                 localStorage.setItem('user', JSON.stringify(data));
-                location.href = 'users.html';
+                location.href = 'user.html';
             } else {
                 document.getElementById('msg').textContent = data.error;
             }

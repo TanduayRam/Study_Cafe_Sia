@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seat Availability</title>
+</head>
+<body>
+    <h2>Seats Ready for You</h2>
+    <h3>A little look at the seats waiting for their next study session.</h3>
+
+    <button onclick="loadReport()">Refresh Seats</button>
+
+    <p id="status">Checking which seats are ready...</p>
+
+    <table border="1" cellpadding="8">
+        <thead>
+            <tr>
+                <th>Seat ID</th>
+                <th>Seat Label</th>
+                <th>Seat Status</th>
+                <th>Study Zone ID</th>
+            </tr>
+        </thead>
+        <tbody id="reportTable">
+        </tbody>
+    </table>
+
+    <script>
+        async function loadReport() {
+            const status = document.getElementById('status');
+            const table = document.getElementById('reportTable');
+
+            status.textContent = 'Updating your seat list...';
+            table.innerHTML = '';
+
+            try {
+                const response = await fetch(
+                    '/api/seats/without-active-reservation'
+                );
+
+                if (!response.ok) {
+                    throw new Error('We couldn\'t retrieve the seat list. Please try again.');
+                }
+
+                const seats = await response.json();
+
+                if (seats.length === 0) {
+                    status.textContent = 'All seats are currently accounted for!';
+                    return;
+                }
+
+                seats.forEach(seat => {
+                    const row = document.createElement('tr');
+
+                    [
+                        seat.seat_id,
+                        seat.seat_label,
+                        seat.seat_status,
+                        seat.study_zone_id
+                    ].forEach(value => {
+                        const cell = document.createElement('td');
+                        cell.textContent = value;
+                        row.appendChild(cell);
+                    });
+
+                    table.appendChild(row);
+                });
+
+                status.textContent = 'Your seat list is all set!';
+
+            } catch (error) {
+                status.textContent = error.message;
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+</html>

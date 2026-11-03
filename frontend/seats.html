@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Seats</title>
+</head>
+<body>
+    <h2>Find Your Seat</h2>
+
+<h3>Choose the seat that makes you focus better!</h3>
+
+<form id="seatForm">
+    <select id="study_zone_id" required>
+    <option value="">Choose a Study Zone</option>
+</select>
+    <input id="label" placeholder="Seat Label" required>
+
+    <select id="seat_status" required>
+        <option value="Available">Available</option>
+        <option value="Occupied">Occupied</option>
+    </select>
+
+    <button type="submit">Save Seat</button>
+</form>
+
+    <p id="status">Loading seats available for you...wait lang..ehe.</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Study Zone ID</th>
+                <th>Seat Label</th>
+                <th>Status</th>
+                <th>Do you want to</th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
+
+    <script>
+        let editingSeatId = null;
+        async function editSeat(id) {
+    try {
+        const res = await fetch('/api/seats/' + id);
+
+        if (!res.ok) {
+            throw new Error('Unable to load seat details.');
+        }
+
+        const seat = await res.json();
+
+        document.getElementById('study_zone_id').value = seat.study_zone_id;
+        document.getElementById('label').value = seat.label;
+        document.getElementById('seat_status').value = seat.status;
+
+        editingSeatId = id;
+        document.querySelector('#seatForm button[type="submit"]').textContent = 'Save Changes';
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+        async function loadStudyZones() {
+    const dropdown = document.getElementById('study_zone_id');
+
+    try {
+        const res = await fetch('/api/study-zones');
+        if (!res.ok) {
+            throw new Error('Unable to load study zones.');
+        }
+
+        const zones = await res.json();
+
+        dropdown.innerHTML = '<option value="">Choose your Study Zone</option>' +
+            zones.map(zone => `
+                <option value="${zone.study_zone_id}">
+                    ${zone.name}
+                </option>
+            `).join('');
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+        async function loadSeats() {
+            const status = document.getElementById('status');
+            const list = document.getElementById('list');
+
+            status.textContent = 'Loading seats...';
+
+            try {
+                const res = await fetch('/api/seats');
+
+                if (!res.ok) {
+                    throw new Error('Failed to load seats.');
+                }
+
+                const seats = await res.json();
+
+seats.sort((a, b) =>
+    a.study_zone_id - b.study_zone_id || a.seat_id - b.seat_id
+);
+
+                list.innerHTML = seats.map(seat => `
+                    <tr>
+    <td>${seat.seat_id}</td>
+    <td>${seat.study_zone_id}</td>
+    <td>${seat.label}</td>
+    <td>${seat.status}</td>
+    <td>
+        <button onclick="editSeat(${seat.seat_id})">Edit</button>
+        <button onclick="deleteSeat(${seat.seat_id})">Delete</button>
+    </td>
+</tr>
+                `).join('');
+
+                status.textContent = 'Seats loaded successfully.';
+            } catch (error) {
+                status.textContent = error.message;
+            }
+        }
+        async function deleteSeat(id) {
+    if (!confirm('Are you sure you want to remove this seat?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/seats/' + id, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || 'Unable to remove seat.');
+        }
+
+        alert('Your seat has been removed!');
+        loadSeats();
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+    document.getElementById('seatForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    const seat = {
+        study_zone_id: document.getElementById('study_zone_id').value,
+        label: document.getElementById('label').value,
+        status: document.getElementById('seat_status').value
+    };
+
+    const url = editingSeatId
+        ? '/api/seats/' + editingSeatId
+        : '/api/seats';
+
+    const method = editingSeatId ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(seat)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message || 'Unable to save your seat.');
+        }
+
+        alert(editingSeatId
+            ? 'Your seat has been updated!'
+            : 'Your new seat is ready!');
+
+        editingSeatId = null;
+        document.getElementById('seatForm').reset();
+        document.querySelector('#seatForm button[type="submit"]').textContent = 'Save Seat';
+
+        loadSeats();
+
+    } catch (error) {
+        alert(error.message);
+    }
+});
+        loadStudyZones();
+        loadSeats();
+    </script>
+</body>
+</html>
