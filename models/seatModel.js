@@ -53,11 +53,30 @@ const remove = async (id) => {
 
     return result.affectedRows;
 };
+// Get seats without active reservations (LEFT JOIN)
+const getSeatsWithoutActiveReservation = async () => {
+    const [rows] = await db.query(
+        `SELECT
+            s.seat_id,
+            s.label AS seat_label,
+            s.status AS seat_status,
+            s.study_zone_id
+        FROM seats s
+        LEFT JOIN reservations r
+            ON s.seat_id = r.seat_id
+            AND r.status IN ('Confirmed', 'CheckedIn')
+        WHERE r.reservation_id IS NULL
+        ORDER BY s.study_zone_id, s.seat_id`
+    );
+
+    return rows;
+};
 
 module.exports = {
     getAll,
     getById,
     create,
     update,
-    remove
+    remove,
+    getSeatsWithoutActiveReservation
 };

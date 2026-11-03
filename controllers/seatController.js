@@ -74,11 +74,22 @@ const remove = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+// Get seats without active reservations
+const getSeatsWithoutActiveReservation = async (req, res) => {
+    try {
+        const seats = await seatModel.getSeatsWithoutActiveReservation();
+
+        res.status(200).json(seats);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 module.exports = {
     getAll,
     getById,
     create,
     update,
-    remove
+    remove,
+    getSeatsWithoutActiveReservation
 };
