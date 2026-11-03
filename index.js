@@ -14,6 +14,19 @@ app.use(express.static(path.join(__dirname, 'frontend')));
 // Authentication and Membership Routes
 app.use('/api/auth', require('./routes/auth_routes'));
 app.use('/api/users', require('./routes/user_routes'));
+app.use('/api/session-logs', require('./routes/session_logs_routes'));
+app.use('/api/alerts', require('./routes/alerts_routes'));
+app.use('/api/engine', require('./routes/engine_routes'));
+app.use('/api/audit-logs', require('./routes/audit_logs_routes'));
+app.use('/api/no-show', require('./routes/no_show_routes'));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'user.html'));
+});
+
+app.listen(3000, () => {
+    console.log('Running at http://localhost:3000');
+});
 
 app.use('/api/v1/dashboard', require('./routes/dashboard_routes'));
 app.use('/api/v1/reports', require('./routes/report_routes'));
@@ -41,6 +54,7 @@ res.send('Express is working!');
 
 console.log('Study Zone routes loaded');
 
+app.listen(3000, () => console.log('Running at http://localhost:3000'));
 app.listen(3000, () => {
 console.log('Running at http://localhost:3000');
 });
