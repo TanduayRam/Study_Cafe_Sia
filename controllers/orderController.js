@@ -220,6 +220,13 @@ const updateStatus = async (req, res) => {
             });
         }
 
+        // Only Pending orders can change status
+        if (order.status !== 'Pending') {
+            return res.status(400).json({
+                message: `Cannot change order status from ${order.status}.`
+            });
+        }
+
         await orderModel.updateStatus(orderId, status);
 
         res.status(200).json({
@@ -229,8 +236,10 @@ const updateStatus = async (req, res) => {
         });
 
     } catch (error) {
+        console.error('Update Order Status Error:', error);
+
         res.status(500).json({
-            message: error.message
+            message: 'Failed to update order status.'
         });
     }
 };
@@ -240,4 +249,4 @@ module.exports = {
     getById,
     create,
     updateStatus
-};
+ };
