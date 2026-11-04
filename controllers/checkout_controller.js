@@ -2,7 +2,7 @@ const checkoutModel = require('../models/checkout_model');
 
 async function checkoutReservation(req, res) {
     try {
-        const reservationId = Number(req.params.reservationId);
+        const reservationId = Number(req.params.reservationId ?? req.params.id);
         const { payment_method } = req.body;
 
         if (!Number.isInteger(reservationId) || reservationId <= 0) {
@@ -23,9 +23,10 @@ async function checkoutReservation(req, res) {
             });
         }
 
+        const normalizedPaymentMethod = payment_method.trim();
         const allowedPaymentMethods = ['Cash', 'GCash', 'Card'];
 
-        if (!allowedPaymentMethods.includes(payment_method.trim())) {
+        if (!allowedPaymentMethods.includes(normalizedPaymentMethod)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid payment method. Allowed methods are Cash, GCash, and Card.'
@@ -37,7 +38,7 @@ async function checkoutReservation(req, res) {
 
         const result = await checkoutModel.checkoutReservation(
             reservationId,
-            payment_method.trim(),
+            normalizedPaymentMethod,
             checkoutTime
         );
 
@@ -59,4 +60,4 @@ async function checkoutReservation(req, res) {
 
 module.exports = {
     checkoutReservation
- };
+};

@@ -1,8 +1,8 @@
- require('dotenv').config();
+require('dotenv').config();
 
- const express = require('express');
- const cors = require('cors');
- const path = require('path');
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const db = require('./config/databases');
@@ -55,12 +55,14 @@ app.use('/api/v1/feedback-reviews', require('./routes/feedback_review_routes'));
 app.use('/api/v1/report-snapshots', require('./routes/report_snapshot_routes'));
 
 // Membership and Payments
- app.use('/api/pass-packages', require('./routes/pass_package_routes'));
- app.use('/api/member-passes', require('./routes/member_pass_routes'));
- app.use('/api/payments', require('./routes/payment_routes'));
- app.use('/api/billing', require('./routes/billing_routes'));
- app.use('/api/reports', require('./routes/member_pass_report_routes'));
- app.use('/api/checkout', require('./routes/checkout_routes'));
+app.use('/api/pass-packages', require('./routes/pass_package_routes'));
+app.use('/api/member-passes', require('./routes/member_pass_routes'));
+app.use('/api/payments', require('./routes/payment_routes'));
+app.use('/api/billing', require('./routes/billing_routes'));
+app.use('/api/billing', require('./routes/no_show_routes'));
+app.use('/api/reports', require('./routes/member_pass_report_routes'));
+app.use('/api/reports', require('./routes/reservation_order_report_routes'));
+app.use('/api/checkout', require('./routes/checkout_routes'));
 
 // Study Café Routes
 app.use('/api/study-zones', require('./routes/studyZoneRoutes'));
@@ -79,4 +81,4 @@ const PORT = 3000;
 
 app.listen(PORT, () => {
     console.log(`Study Café server running at http://localhost:${PORT}`);
- });
+});

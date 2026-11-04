@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const reservationController = require('../controllers/reservationController');
+const checkoutController = require('../controllers/checkout_controller');
 
 const {
     authenticateToken,
@@ -48,6 +49,14 @@ router.post(
     reservationController.checkIn
 );
 
+// Billing-aware checkout: Admin and Staff
+router.post(
+    '/:id/check-out',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    checkoutController.checkoutReservation
+);
+
 // Cancel: Admin and Customer
 router.delete(
     '/:id',
@@ -56,4 +65,4 @@ router.delete(
     reservationController.remove
 );
 
- module.exports = router;
+module.exports = router;
