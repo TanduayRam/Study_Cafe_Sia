@@ -38,6 +38,7 @@ app.use('/api/payments', require('./routes/payment_routes'));
 app.use('/api/billing', require('./routes/billing_routes'));
 app.use('/api/billing', require('./routes/no_show_routes'));
 app.use('/api/reports', require('./routes/member_pass_report_routes'));
+app.use('/api/reports', require('./routes/reservation_order_report_routes'));
 app.use('/api/checkout', require('./routes/checkout_routes'));
 
 // Study Café Routes
