@@ -3,7 +3,7 @@ const checkoutModel = require('../models/checkout_model');
 async function checkoutReservation(req, res) {
     try {
         const reservationId = Number(req.params.reservationId ?? req.params.id);
-        const { payment_method, checkout_time } = req.body;
+        const { payment_method } = req.body;
 
         if (!Number.isInteger(reservationId) || reservationId <= 0) {
             return res.status(400).json({
@@ -33,16 +33,8 @@ async function checkoutReservation(req, res) {
             });
         }
 
-        const checkoutTime = checkout_time
-            ? new Date(checkout_time)
-            : new Date();
-
-        if (isNaN(checkoutTime.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid checkout time.'
-            });
-        }
+        // Use server time to prevent clients from manipulating checkout time.
+        const checkoutTime = new Date();
 
         const result = await checkoutModel.checkoutReservation(
             reservationId,

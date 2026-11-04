@@ -1,94 +1,834 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>Seats</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Café | Seats Management</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            background: #f7f5f0;
+            color: #35251c;
+        }
+
+        /* SIDEBAR - NO PAGE ANIMATION */
+
+        .sidebar {
+            width: 255px;
+            background: #302219;
+            color: #fffaf1;
+            padding: 30px 18px;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 21px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            padding: 5px 12px 35px;
+        }
+
+        .logo span {
+            color: #d9b98e;
+        }
+
+        .nav-label {
+            color: #a99785;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links a {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            color: #d8cbbd;
+            text-decoration: none;
+            padding: 13px 14px;
+            margin: 4px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            background: #584333;
+            color: white;
+        }
+
+        .nav-links a.active {
+            border-left: 3px solid #d9b98e;
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            border-top: 1px solid #514033;
+            padding-top: 20px;
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        /* MAIN LAYOUT */
+
+        .main {
+            margin-left: 255px;
+            min-width: 0;
+        }
+
+        /* TOPBAR - NO PAGE ANIMATION */
+
+        .topbar {
+            height: 82px;
+            background: white;
+            border-bottom: 1px solid #eee8df;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 38px;
+        }
+
+        .topbar h2 {
+            font-size: 21px;
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .profile-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ddce;
+            color: #493326;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+        }
+
+        .profile-info strong {
+            display: block;
+            font-size: 13px;
+        }
+
+        .profile-info span {
+            font-size: 11px;
+            color: #968779;
+        }
+
+        /* CONTENT */
+
+        .content {
+            padding: 35px 38px;
+            max-width: 1600px;
+            margin: auto;
+        }
+
+        /* PAGE ENTRANCE ANIMATIONS */
+
+        @keyframes contentFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .content > * {
+            animation: contentFadeUp 0.45s ease both;
+        }
+
+        .content > .welcome {
+            animation-delay: 0.05s;
+        }
+
+        .content > .summary-card {
+            animation-delay: 0.12s;
+        }
+
+        .content > .form-section {
+            animation-delay: 0.19s;
+        }
+
+        .content > .table-section {
+            animation-delay: 0.26s;
+        }
+
+        .content > .page-footer {
+            animation-delay: 0.33s;
+        }
+
+        /* WELCOME */
+
+        .welcome {
+            margin-bottom: 30px;
+        }
+
+        .welcome h1 {
+            font-size: 27px;
+            margin-bottom: 8px;
+        }
+
+        .welcome p {
+            color: #938578;
+            font-size: 14px;
+        }
+
+        /* SUMMARY CARD */
+
+        .summary-card {
+            background: white;
+            border: 1px solid #eee8df;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(50, 35, 25, 0.07);
+        }
+
+        .summary-card p {
+            color: #988a7c;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .summary-card h2 {
+            font-size: 30px;
+            color: #493326;
+        }
+
+        .summary-icon {
+            width: 55px;
+            height: 55px;
+            border-radius: 12px;
+            background: #f1e9df;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 25px;
+            transition: transform 0.25s ease;
+        }
+
+        .summary-card:hover .summary-icon {
+            transform: scale(1.06);
+        }
+
+        /* FORM AND TABLE CARDS */
+
+        .section-card {
+            background: white;
+            border: 1px solid #eee8df;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 12px rgba(50, 35, 25, 0.03);
+            transition: box-shadow 0.25s ease;
+        }
+
+        .section-card:hover {
+            box-shadow: 0 7px 20px rgba(50, 35, 25, 0.06);
+        }
+
+        .section-heading {
+            margin-bottom: 23px;
+        }
+
+        .section-heading h2 {
+            font-size: 19px;
+            margin-bottom: 6px;
+        }
+
+        .section-heading p {
+            color: #988a7c;
+            font-size: 13px;
+        }
+
+        /* FORM */
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #493326;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 9px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #e2d9cd;
+            border-radius: 8px;
+            outline: none;
+            background: white;
+            font-size: 14px;
+            color: #493326;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .form-group input:hover,
+        .form-group select:hover {
+            border-color: #b9a58f;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #896447;
+            box-shadow: 0 0 0 3px rgba(137, 100, 71, 0.10);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
+
+        /* BUTTONS */
+
+        button {
+            border: none;
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 11px 17px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s ease, transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        button:focus-visible {
+            outline: 3px solid rgba(137, 100, 71, 0.25);
+            outline-offset: 2px;
+        }
+
+        .primary-btn {
+            background: #493326;
+            color: white;
+        }
+
+        .primary-btn:hover {
+            background: #654832;
+            box-shadow: 0 4px 10px rgba(73, 51, 38, 0.15);
+        }
+
+        .secondary-btn {
+            background: #f0e9df;
+            color: #493326;
+        }
+
+        .secondary-btn:hover {
+            background: #e4d6c5;
+        }
+
+        .danger-btn {
+            background: #fbe9e7;
+            color: #bd4035;
+        }
+
+        .danger-btn:hover {
+            background: #f5d6d2;
+        }
+
+        /* TABLE */
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 700px;
+        }
+
+        th {
+            text-align: left;
+            background: #f8f5ef;
+            color: #806d5d;
+            font-size: 12px;
+            padding: 15px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0ebe5;
+            font-size: 13px;
+            color: #5d5045;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: #fcfaf7;
+        }
+
+        /* TABLE ROW ANIMATION */
+
+        @keyframes rowFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        tbody tr.row-animated {
+            animation: rowFadeIn 0.3s ease both;
+        }
+
+        /* STATUS */
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .available {
+            background: #e6f2e8;
+            color: #39734a;
+        }
+
+        .occupied {
+            background: #fbe9e7;
+            color: #bd4035;
+        }
+
+        #status {
+            color: #8b7969;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+
+        /* FOOTER */
+
+        .page-footer {
+            text-align: center;
+            color: #a99b8e;
+            font-size: 12px;
+            padding: 20px;
+        }
+
+        /* ACCESSIBILITY */
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 900px) {
+            .sidebar {
+                width: 75px;
+                padding: 25px 10px;
+            }
+
+            .logo {
+                font-size: 0;
+                text-align: center;
+                padding: 5px 0 30px;
+            }
+
+            .logo span {
+                font-size: 23px;
+            }
+
+            .nav-label {
+                display: none;
+            }
+
+            .nav-links a {
+                justify-content: center;
+                padding: 14px 5px;
+                font-size: 0;
+            }
+
+            .nav-icon {
+                font-size: 19px;
+            }
+
+            .main {
+                margin-left: 75px;
+            }
+
+            .content {
+                padding: 25px 18px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .topbar {
+                padding: 0 18px;
+            }
+
+            .topbar h2 {
+                font-size: 17px;
+            }
+
+            .profile-info {
+                display: none;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome h1 {
+                font-size: 23px;
+            }
+
+            .section-card {
+                padding: 18px;
+            }
+        }
+    </style>
 </head>
+
 <body>
-    <h2>Find Your Seat</h2>
 
-<h3>Choose the seat that makes you focus better!</h3>
+    <!-- SIDEBAR -->
 
-<form id="seatForm">
-    <select id="study_zone_id" required>
-    <option value="">Choose a Study Zone</option>
-</select>
-    <input id="label" placeholder="Seat Label" required>
+    <aside class="sidebar">
 
-    <select id="seat_status" required>
-        <option value="Available">Available</option>
-        <option value="Occupied">Occupied</option>
-    </select>
+        <div class="logo">
+            ☕ <span>STUDY CAFÉ</span>
+        </div>
 
-    <button type="submit">Save Seat</button>
-</form>
+        <div class="nav-label">MAIN MENU</div>
 
-    <p id="status">Loading seats available for you...wait lang..ehe.</p>
+        <ul class="nav-links">
 
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Study Zone ID</th>
-                <th>Seat Label</th>
-                <th>Status</th>
-                <th>Do you want to</th>
-            </tr>
-        </thead>
-        <tbody id="list"></tbody>
-    </table>
+            <li>
+                <a href="user.html">
+                    <span class="nav-icon">▦</span> Dashboard
+                </a>
+            </li>
+
+            <li>
+                <a href="user.html#users">
+                    <span class="nav-icon">♙</span> Users
+                </a>
+            </li>
+
+            <li>
+                <a href="zones.html">
+                    <span class="nav-icon">⌂</span> Study Zones
+                </a>
+            </li>
+
+            <li>
+                <a href="seats.html" class="active">
+                    <span class="nav-icon">▣</span> Seats
+                </a>
+            </li>
+
+            <li>
+                <a href="menu.html">
+                    <span class="nav-icon">☕</span> Menu
+                </a>
+            </li>
+
+            <li>
+                <a href="pass_packages.html">
+                    <span class="nav-icon">▤</span> Pass Packages
+                </a>
+            </li>
+
+            <li>
+                <a href="payments.html">
+                    <span class="nav-icon">₱</span> Payments
+                </a>
+            </li>
+
+            <li>
+                <a href="member_passes_report.html">
+                    <span class="nav-icon">📊</span> Member Passes Report
+                </a>
+            </li>
+
+        </ul>
+
+        <div class="sidebar-bottom">
+            <ul class="nav-links">
+                <li>
+                    <a href="login.html"
+                       title="Logout"
+                       onclick="localStorage.removeItem('user')">
+                        <span class="nav-icon">⇥</span>
+                        Logout
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+    </aside>
+
+    <!-- MAIN CONTENT -->
+
+    <main class="main">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <h2>Seats Management</h2>
+
+            <div class="profile">
+
+                <div class="profile-avatar">A</div>
+
+                <div class="profile-info">
+                    <strong>Administrator</strong>
+                    <span>System Management</span>
+                </div>
+
+            </div>
+
+        </header>
+
+        <div class="content">
+
+            <!-- WELCOME -->
+
+            <div class="welcome">
+                <h1>Seats Management</h1>
+                <p>Manage seating availability and organize seats by study zone.</p>
+            </div>
+
+            <!-- SUMMARY -->
+
+            <div class="summary-card">
+
+                <div>
+                    <p>Total Seats</p>
+                    <h2 id="seatCount">0</h2>
+                </div>
+
+                <div class="summary-icon">▣</div>
+
+            </div>
+
+            <!-- ADD / EDIT SEAT -->
+
+            <section class="section-card form-section">
+
+                <div class="section-heading">
+                    <h2 id="formTitle">Add a New Seat</h2>
+                    <p>Assign a seat to a study zone and manage its availability.</p>
+                </div>
+
+                <form id="seatForm">
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="study_zone_id">Study Zone</label>
+                            <select id="study_zone_id" required>
+                                <option value="">Loading study zones...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="label">Seat Label</label>
+                            <input id="label" type="text" placeholder="e.g. Seat A1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="seat_status">Seat Status</label>
+                            <select id="seat_status" required>
+                                <option value="Available">Available</option>
+                                <option value="Occupied">Occupied</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="form-actions">
+
+                        <button type="submit" class="primary-btn" id="saveButton">
+                            Save Seat
+                        </button>
+
+                        <button type="button" class="secondary-btn" id="cancelButton"
+                            onclick="cancelEdit()" hidden>
+                            Cancel Editing
+                        </button>
+
+                    </div>
+
+                </form>
+
+                <p id="status">Loading seats available for you...</p>
+
+            </section>
+
+            <!-- SEATS TABLE -->
+
+            <section class="section-card table-section">
+
+                <div class="section-heading">
+                    <h2>All Seats</h2>
+                    <p>View, edit, and remove seats registered in your study café.</p>
+                </div>
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+                            <tr>
+                                <th>Seat ID</th>
+                                <th>Study Zone ID</th>
+                                <th>Seat Label</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="list"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+            <!-- FOOTER -->
+
+            <div class="page-footer">
+                © 2026 Study Café. All Rights Reserved.
+            </div>
+
+        </div>
+
+    </main>
 
     <script>
+
         let editingSeatId = null;
-        async function editSeat(id) {
-    try {
-        const res = await fetch('/api/seats/' + id);
 
-        if (!res.ok) {
-            throw new Error('Unable to load seat details.');
-        }
+        // LOAD STUDY ZONES
 
-        const seat = await res.json();
-
-        document.getElementById('study_zone_id').value = seat.study_zone_id;
-        document.getElementById('label').value = seat.label;
-        document.getElementById('seat_status').value = seat.status;
-
-        editingSeatId = id;
-        document.querySelector('#seatForm button[type="submit"]').textContent = 'Save Changes';
-
-    } catch (error) {
-        alert(error.message);
-    }
-}
         async function loadStudyZones() {
-    const dropdown = document.getElementById('study_zone_id');
 
-    try {
-        const res = await fetch('/api/study-zones');
-        if (!res.ok) {
-            throw new Error('Unable to load study zones.');
+            const dropdown = document.getElementById('study_zone_id');
+
+            try {
+
+                const res = await fetch('/api/study-zones');
+
+                if (!res.ok) {
+                    throw new Error('Unable to load study zones.');
+                }
+
+                const zones = await res.json();
+
+                dropdown.innerHTML = '<option value="">Choose a Study Zone</option>' +
+                    zones.map(zone => `
+                        <option value="${zone.study_zone_id}">
+                            ${zone.name}
+                        </option>
+                    `).join('');
+
+            } catch (error) {
+
+                dropdown.innerHTML = '<option value="">Unable to load study zones</option>';
+                alert(error.message);
+
+            }
+
         }
 
-        const zones = await res.json();
+        // LOAD SEATS
 
-        dropdown.innerHTML = '<option value="">Choose your Study Zone</option>' +
-            zones.map(zone => `
-                <option value="${zone.study_zone_id}">
-                    ${zone.name}
-                </option>
-            `).join('');
-
-    } catch (error) {
-        alert(error.message);
-    }
-}
         async function loadSeats() {
+
             const status = document.getElementById('status');
             const list = document.getElementById('list');
 
             status.textContent = 'Loading seats...';
 
             try {
+
                 const res = await fetch('/api/seats');
 
                 if (!res.ok) {
@@ -97,97 +837,209 @@
 
                 const seats = await res.json();
 
-seats.sort((a, b) =>
-    a.study_zone_id - b.study_zone_id || a.seat_id - b.seat_id
-);
+                // Sort seats by Seat ID in ascending order
+
+                seats.sort((a, b) =>
+                    Number(a.seat_id) - Number(b.seat_id)
+                );
 
                 list.innerHTML = seats.map(seat => `
                     <tr>
-    <td>${seat.seat_id}</td>
-    <td>${seat.study_zone_id}</td>
-    <td>${seat.label}</td>
-    <td>${seat.status}</td>
-    <td>
-        <button onclick="editSeat(${seat.seat_id})">Edit</button>
-        <button onclick="deleteSeat(${seat.seat_id})">Delete</button>
-    </td>
-</tr>
+                        <td>${seat.seat_id}</td>
+                        <td>${seat.study_zone_id}</td>
+                        <td><strong>${seat.label}</strong></td>
+                        <td>
+                            <span class="status ${seat.status.toLowerCase() === 'available' ? 'available' : 'occupied'}">
+                                ${seat.status}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="secondary-btn" onclick="editSeat(${seat.seat_id})">
+                                Edit
+                            </button>
+
+                            <button class="danger-btn" onclick="deleteSeat(${seat.seat_id})">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
                 `).join('');
 
+                // Animate table rows one after another
+
+                document.querySelectorAll('#list tr').forEach((row, index) => {
+                    row.classList.add('row-animated');
+                    row.style.animationDelay = `${Math.min(index * 0.035, 0.35)}s`;
+                });
+
+                document.getElementById('seatCount').textContent = seats.length;
+
                 status.textContent = 'Seats loaded successfully.';
+
             } catch (error) {
+
                 status.textContent = error.message;
+
             }
+
         }
+
+        // EDIT SEAT
+
+        async function editSeat(id) {
+
+            try {
+
+                const res = await fetch('/api/seats/' + id);
+
+                if (!res.ok) {
+                    throw new Error('Unable to load seat details.');
+                }
+
+                const seat = await res.json();
+
+                document.getElementById('study_zone_id').value = seat.study_zone_id;
+                document.getElementById('label').value = seat.label;
+                document.getElementById('seat_status').value = seat.status;
+
+                editingSeatId = id;
+
+                document.getElementById('formTitle').textContent = 'Edit Seat';
+                document.getElementById('saveButton').textContent = 'Save Changes';
+                document.getElementById('cancelButton').hidden = false;
+
+                document.getElementById('seatForm').scrollIntoView({
+                    behavior: 'smooth'
+                });
+
+            } catch (error) {
+
+                alert(error.message);
+
+            }
+
+        }
+
+        // CANCEL EDITING
+
+        function cancelEdit() {
+
+            editingSeatId = null;
+
+            document.getElementById('seatForm').reset();
+
+            document.getElementById('formTitle').textContent = 'Add a New Seat';
+            document.getElementById('saveButton').textContent = 'Save Seat';
+            document.getElementById('cancelButton').hidden = true;
+
+        }
+
+        // DELETE SEAT
+
         async function deleteSeat(id) {
-    if (!confirm('Are you sure you want to remove this seat?')) {
-        return;
-    }
 
-    try {
-        const res = await fetch('/api/seats/' + id, {
-            method: 'DELETE'
-        });
+            if (!confirm('Are you sure you want to remove this seat?')) {
+                return;
+            }
 
-        const data = await res.json();
+            try {
 
-        if (!res.ok) {
-            throw new Error(data.message || 'Unable to remove seat.');
+                const res = await fetch('/api/seats/' + id, {
+                    method: 'DELETE'
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to remove seat.');
+                }
+
+                alert('Your seat has been removed!');
+
+                if (editingSeatId === id) {
+                    cancelEdit();
+                }
+
+                loadSeats();
+
+            } catch (error) {
+
+                alert(error.message);
+
+            }
+
         }
 
-        alert('Your seat has been removed!');
-        loadSeats();
+        // CREATE / UPDATE SEAT
 
-    } catch (error) {
-        alert(error.message);
-    }
-}
-    document.getElementById('seatForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
+        document.getElementById('seatForm').addEventListener('submit', async function(event) {
 
-    const seat = {
-        study_zone_id: document.getElementById('study_zone_id').value,
-        label: document.getElementById('label').value,
-        status: document.getElementById('seat_status').value
-    };
+            event.preventDefault();
 
-    const url = editingSeatId
-        ? '/api/seats/' + editingSeatId
-        : '/api/seats';
+            const seat = {
 
-    const method = editingSeatId ? 'PUT' : 'POST';
+                study_zone_id: document.getElementById('study_zone_id').value,
+                label: document.getElementById('label').value.trim(),
+                status: document.getElementById('seat_status').value
 
-    try {
-        const res = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(seat)
+            };
+
+            const url = editingSeatId
+                ? '/api/seats/' + editingSeatId
+                : '/api/seats';
+
+            const method = editingSeatId ? 'PUT' : 'POST';
+
+            try {
+
+                const res = await fetch(url, {
+
+                    method: method,
+
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+
+                    body: JSON.stringify(seat)
+
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to save your seat.');
+                }
+
+                alert(editingSeatId
+                    ? 'Your seat has been updated!'
+                    : 'Your new seat is ready!');
+
+                cancelEdit();
+
+                loadSeats();
+
+            } catch (error) {
+
+                alert(error.message);
+
+            }
+
         });
 
-        const data = await res.json();
+        // AUTHENTICATION CHECK
 
-        if (!res.ok) {
-            throw new Error(data.message || 'Unable to save your seat.');
+        if (!localStorage.getItem('user')) {
+
+            location.href = 'login.html';
+
+        } else {
+
+            loadStudyZones();
+            loadSeats();
+
         }
 
-        alert(editingSeatId
-            ? 'Your seat has been updated!'
-            : 'Your new seat is ready!');
-
-        editingSeatId = null;
-        document.getElementById('seatForm').reset();
-        document.querySelector('#seatForm button[type="submit"]').textContent = 'Save Seat';
-
-        loadSeats();
-
-    } catch (error) {
-        alert(error.message);
-    }
-});
-        loadStudyZones();
-        loadSeats();
     </script>
+
 </body>
 </html>

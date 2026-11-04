@@ -1,8 +1,13 @@
 const db = require('../config/databases');
 
-// Round amounts to two decimal places
+// Round monetary amounts to two decimal places
 function roundMoney(amount) {
     return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+// Round hours to two decimal places
+function roundHours(hours) {
+    return Math.round((hours + Number.EPSILON) * 100) / 100;
 }
 
 // Calculate the bill for a reservation
@@ -61,8 +66,9 @@ async function computeBill(
     }
 
     // Calculate session duration
-    const sessionHours =
-        (endTime.getTime() - startTime.getTime()) / 3600000;
+    const sessionHours = roundHours(
+        (endTime.getTime() - startTime.getTime()) / 3600000
+    );
 
     const hourlyRate = Number(reservation.hourly_rate);
 
@@ -96,8 +102,7 @@ async function computeBill(
         memberPasses = passes;
     }
 
-    // Calculate pass usage and remaining cash hours
-    let passHoursUsed = 0;
+     // Calculate pass usage and remaining cash hours
     let cashHours = sessionHours;
     const passDeductions = [];
 
@@ -112,25 +117,41 @@ async function computeBill(
             continue;
         }
 
-        const hoursToUse = Math.min(remainingHours, cashHours);
+        // Round each deduction to two decimal places
+        const hoursToUse = roundHours(
+            Math.min(remainingHours, cashHours)
+        );
 
-        passHoursUsed += hoursToUse;
-        cashHours -= hoursToUse;
+        if (hoursToUse <= 0) {
+            continue;
+        }
 
         passDeductions.push({
             member_pass_id: pass.member_pass_id,
             hours_used: hoursToUse
         });
+
+        cashHours = roundHours(cashHours - hoursToUse);
     }
 
+    // Calculate total pass hours used
+    const passHoursUsed = roundHours(
+        passDeductions.reduce(
+            (total, deduction) => total + deduction.hours_used,
+            0
+        )
+    );
+
     // Calculate regular session amounts
-    passHoursUsed = Number(passHoursUsed.toFixed(2));
-    cashHours = Number(cashHours.toFixed(2));
+    cashHours = roundHours(Math.max(0, cashHours));
 
-    const passAmount = roundMoney(passHoursUsed * hourlyRate);
+    const passAmount = roundMoney(
+        passHoursUsed * hourlyRate
+    );
 
-    // Keep regular cash session amount separate
-    const cashSessionAmount = roundMoney(cashHours * hourlyRate);
+    const cashSessionAmount = roundMoney(
+        cashHours * hourlyRate
+    );
 
     // Get served order totals for this reservation
     const [orders] = await connection.query(
@@ -141,12 +162,18 @@ async function computeBill(
         [reservationId]
     );
 
-    const ordersTotal = roundMoney(Number(orders[0].orders_total));
+    const ordersTotal = roundMoney(
+        Number(orders[0].orders_total)
+    );
+
+    if (!Number.isFinite(ordersTotal) || ordersTotal < 0) {
+        throw new Error('Invalid served order total.');
+    }
 
     // Calculate peak-hour overlap (4 PM to 8 PM)
     let peakHours = 0;
 
-    let currentDay = new Date(startTime);
+    const currentDay = new Date(startTime);
     currentDay.setHours(0, 0, 0, 0);
 
     while (currentDay.getTime() <= endTime.getTime()) {
@@ -174,21 +201,30 @@ async function computeBill(
         currentDay.setDate(currentDay.getDate() + 1);
     }
 
-    // Calculate 10% peak-hour surcharge
+    peakHours = roundHours(peakHours);
+
+    // Apply 10% peak-hour surcharge,
+    // even when member-pass hours are used
     const peakSurcharge = roundMoney(
         peakHours * hourlyRate * 0.10
     );
 
     // Calculate overtime
-    const overtimeHours = Math.max(
+    const overtimeMilliseconds = Math.max(
         0,
-        (actualCheckoutTime.getTime() - endTime.getTime()) / 3600000
+        actualCheckoutTime.getTime() - endTime.getTime()
     );
 
     // Charge for every started 30-minute period
-    const overtimePeriods = Math.ceil(overtimeHours * 2);
+    const overtimePeriods = Math.ceil(
+        overtimeMilliseconds / (30 * 60 * 1000)
+    );
 
     const billedOvertimeHours = overtimePeriods * 0.5;
+
+    const actualOvertimeHours = roundHours(
+        overtimeMilliseconds / 3600000
+    );
 
     const overtimeAmount = roundMoney(
         overtimePeriods * (hourlyRate / 2)
@@ -218,10 +254,10 @@ async function computeBill(
         pass_amount: passAmount,
         cash_session_amount: cashSessionAmount,
         cash_amount: cashAmount,
-        peak_hours: Number(peakHours.toFixed(2)),
+        peak_hours: peakHours,
         peak_surcharge: peakSurcharge,
         overtime_hours: billedOvertimeHours,
-        actual_overtime_hours: Number(overtimeHours.toFixed(2)),
+        actual_overtime_hours: actualOvertimeHours,
         overtime_amount: overtimeAmount,
         orders_total: ordersTotal,
         total_amount: totalAmount
