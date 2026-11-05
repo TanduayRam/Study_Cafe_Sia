@@ -3,13 +3,41 @@ const router = express.Router();
 
 const orderController = require('../controllers/orderController');
 
-// Get all orders
-router.get('/', orderController.getAll);
+const {
+    authenticateToken,
+    authorizeRoles
+} = require('../middleware/auth_middleware');
 
-// Get one order
-router.get('/:id', orderController.getById);
+// View all orders: Admin and Staff
+router.get(
+    '/',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.getAll
+);
 
-// Create an order
-router.post('/', orderController.create);
+// View one order: Admin and Staff
+router.get(
+    '/:id',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.getById
+);
 
-module.exports = router;
+// Create an order: Admin and Staff
+router.post(
+    '/',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.create
+);
+
+// Update order status: Admin and Staff
+router.patch(
+    '/:id/status',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.updateStatus
+);
+
+ module.exports = router;

@@ -3,14 +3,24 @@ const seatModel = require('../models/seatModel');
 const studyZoneModel = require('../models/studyZoneModel');
 const db = require('../config/databases');
 
+// Check whether the logged-in user owns a reservation.
+const isOwner = (reservation, user) => {
+    return Number(reservation.user_id) === Number(user.id);
+};
 
 // Get all reservations
 const getAll = async (req, res) => {
     try {
         const reservations = await reservationModel.getAll();
-        res.status(200).json(reservations);
+
+        return res.status(200).json(reservations);
+
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Get reservations error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to retrieve reservations.'
+        });
     }
 };
 
@@ -25,9 +35,24 @@ const getById = async (req, res) => {
             });
         }
 
-        res.status(200).json(reservation);
+        // Customers can only access their own reservations.
+        if (
+            req.user.role === 'customer' &&
+            !isOwner(reservation, req.user)
+        ) {
+            return res.status(403).json({
+                message: 'You can only access your own reservations.'
+            });
+        }
+
+        return res.status(200).json(reservation);
+
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Get reservation error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to retrieve reservation.'
+        });
     }
 };
 
@@ -41,14 +66,16 @@ const create = async (req, res) => {
             end_time
         } = req.body;
 
-        // Check required fields
-        if (!user_id || !seat_id || !start_time || !end_time) {
+        // Customers must use their authenticated account ID.
+        const reservationUserId =
+            req.user.role === 'customer' ? req.user.id : user_id;
+
+        if (!reservationUserId || !seat_id || !start_time || !end_time) {
             return res.status(400).json({
                 message: 'User, seat, start time, and end time are required.'
             });
         }
-
-        // Validate date values
+ 
         const start = new Date(start_time);
         const end = new Date(end_time);
 
@@ -63,8 +90,7 @@ const create = async (req, res) => {
                 message: 'End time must be later than start time.'
             });
         }
-
-        // Check minimum reservation duration
+ 
         const duration = (end - start) / (1000 * 60 * 60);
 
         if (duration < 1) {
@@ -73,10 +99,10 @@ const create = async (req, res) => {
             });
         }
 
-        // Check whether the user exists
+        // Check whether the user exists.
         const [users] = await db.query(
             'SELECT id FROM users WHERE id = ?',
-            [user_id]
+            [reservationUserId]
         );
 
         if (users.length === 0) {
@@ -85,7 +111,7 @@ const create = async (req, res) => {
             });
         }
 
-        // Check whether the seat exists
+        // Check whether the seat exists.
         const seat = await seatModel.getById(seat_id);
 
         if (!seat) {
@@ -93,14 +119,14 @@ const create = async (req, res) => {
                 message: 'Seat not found.'
             });
         }
-// Check whether the seat is available
-if (seat.status !== 'Available') {
-    return res.status(400).json({
-        message: 'This seat is not available.'
-    });
-}
 
-        // Get the seat's study zone
+        if (seat.status !== 'Available') {
+            return res.status(400).json({
+                message: 'This seat is not available.'
+            });
+        }
+
+        // Check the study zone.
         const zone = await studyZoneModel.getById(seat.study_zone_id);
 
         if (!zone) {
@@ -109,14 +135,13 @@ if (seat.status !== 'Available') {
             });
         }
 
-        // Check maximum reservation duration
-        if (duration > zone.max_hours) {
+         if (duration > zone.max_hours) {
             return res.status(400).json({
                 message: `Maximum reservation duration for this zone is ${zone.max_hours} hours.`
             });
         }
 
-        // Check overlapping reservations
+        // Check for overlapping reservations.
         const [conflicts] = await db.query(
             `SELECT reservation_id
              FROM reservations
@@ -133,29 +158,30 @@ if (seat.status !== 'Available') {
             });
         }
 
-        // Create reservation
-        const reservation = await reservationModel.create({
-            user_id,
+         const reservation = await reservationModel.create({
+            user_id: reservationUserId,
             seat_id,
             start_time,
             end_time
         });
 
-        res.status(201).json(reservation);
+        return res.status(201).json(reservation);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Create reservation error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to create reservation.'
+        });
     }
 };
-
-// Update a reservation
-// Update a reservation
-const update = async (req, res) => {
+ 
+ // Update a reservation
+ const update = async (req, res) => {
     try {
         const id = req.params.id;
 
-        // Find existing reservation
-        const existing = await reservationModel.getById(id);
+         const existing = await reservationModel.getById(id);
 
         if (!existing) {
             return res.status(404).json({
@@ -163,7 +189,16 @@ const update = async (req, res) => {
             });
         }
 
-        // Only confirmed reservations can be updated
+        // Customers can only update their own reservations.
+        if (
+            req.user.role === 'customer' &&
+            !isOwner(existing, req.user)
+        ) {
+            return res.status(403).json({
+                message: 'You can only update your own reservations.'
+            });
+        }
+
         if (existing.status !== 'Confirmed') {
             return res.status(400).json({
                 message: 'Only confirmed reservations can be updated.'
@@ -172,14 +207,12 @@ const update = async (req, res) => {
 
         const { seat_id, start_time, end_time } = req.body;
 
-        // Check required fields
-        if (!seat_id || !start_time || !end_time) {
+         if (!seat_id || !start_time || !end_time) {
             return res.status(400).json({
                 message: 'Seat, start time, and end time are required.'
             });
         }
-
-        // Validate date values
+ 
         const start = new Date(start_time);
         const end = new Date(end_time);
 
@@ -195,8 +228,7 @@ const update = async (req, res) => {
             });
         }
 
-        // Check minimum duration
-        const duration = (end - start) / (1000 * 60 * 60);
+         const duration = (end - start) / (1000 * 60 * 60);
 
         if (duration < 1) {
             return res.status(400).json({
@@ -204,7 +236,7 @@ const update = async (req, res) => {
             });
         }
 
-        // Check whether the seat exists
+        // Check whether the seat exists.
         const seat = await seatModel.getById(seat_id);
 
         if (!seat) {
@@ -213,13 +245,13 @@ const update = async (req, res) => {
             });
         }
 
-        // Check whether the seat is available
-if (seat.status !== 'Available') {
-    return res.status(400).json({
-        message: 'This seat is not available.'
-    });
-}
-        // Get the seat's study zone
+        if (seat.status !== 'Available') {
+            return res.status(400).json({
+                message: 'This seat is not available.'
+            });
+        }
+
+        // Check the study zone.
         const zone = await studyZoneModel.getById(seat.study_zone_id);
 
         if (!zone) {
@@ -227,15 +259,14 @@ if (seat.status !== 'Available') {
                 message: 'Study zone not found.'
             });
         }
-
-        // Check maximum duration
+ 
         if (duration > zone.max_hours) {
             return res.status(400).json({
                 message: `Maximum reservation duration for this zone is ${zone.max_hours} hours.`
             });
         }
 
-        // Check overlapping reservations, excluding itself
+        // Check for overlapping reservations, excluding the current reservation.
         const [conflicts] = await db.query(
             `SELECT reservation_id
              FROM reservations
@@ -252,8 +283,7 @@ if (seat.status !== 'Available') {
                 message: 'This seat already has a reservation during that time.'
             });
         }
-
-        // Update reservation
+ 
         await reservationModel.update(id, {
             user_id: existing.user_id,
             seat_id,
@@ -262,21 +292,26 @@ if (seat.status !== 'Available') {
             status: existing.status
         });
 
-        // Retrieve updated reservation
-        const updated = await reservationModel.getById(id);
+         const updated = await reservationModel.getById(id);
 
-        res.status(200).json(updated);
+        return res.status(200).json(updated);
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Update reservation error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to update reservation.'
+        });
     }
 };
 
 // Check in a reservation
 const checkIn = async (req, res) => {
-    const connection = await db.getConnection();
+    let connection;
 
     try {
+        connection = await db.getConnection();
+
         await connection.beginTransaction();
 
         const [rows] = await connection.query(
@@ -286,6 +321,7 @@ const checkIn = async (req, res) => {
 
         if (rows.length === 0) {
             await connection.rollback();
+
             return res.status(404).json({
                 message: 'Reservation not found.'
             });
@@ -295,6 +331,7 @@ const checkIn = async (req, res) => {
 
         if (reservation.status !== 'Confirmed') {
             await connection.rollback();
+
             return res.status(400).json({
                 message: 'Only confirmed reservations can be checked in.'
             });
@@ -316,7 +353,7 @@ const checkIn = async (req, res) => {
 
         await connection.commit();
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Customer checked in successfully.',
             reservation_id: reservation.reservation_id,
             seat_id: reservation.seat_id,
@@ -325,18 +362,34 @@ const checkIn = async (req, res) => {
         });
 
     } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: error.message });
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Check-in rollback error:', rollbackError);
+            }
+        }
+
+        console.error('Check-in error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to check in reservation.'
+        });
+
     } finally {
-        connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
 // Check out a reservation
 const checkOut = async (req, res) => {
-    const connection = await db.getConnection();
+    let connection;
 
     try {
+        connection = await db.getConnection();
+
         await connection.beginTransaction();
 
         const [rows] = await connection.query(
@@ -346,6 +399,7 @@ const checkOut = async (req, res) => {
 
         if (rows.length === 0) {
             await connection.rollback();
+
             return res.status(404).json({
                 message: 'Reservation not found.'
             });
@@ -355,6 +409,7 @@ const checkOut = async (req, res) => {
 
         if (reservation.status !== 'CheckedIn') {
             await connection.rollback();
+
             return res.status(400).json({
                 message: 'Only checked-in reservations can be checked out.'
             });
@@ -376,7 +431,7 @@ const checkOut = async (req, res) => {
 
         await connection.commit();
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Customer checked out successfully.',
             reservation_id: reservation.reservation_id,
             seat_id: reservation.seat_id,
@@ -385,18 +440,34 @@ const checkOut = async (req, res) => {
         });
 
     } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: error.message });
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Check-out rollback error:', rollbackError);
+            }
+        }
+
+        console.error('Check-out error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to check out reservation.'
+        });
+
     } finally {
-        connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
 // Cancel a reservation
 const remove = async (req, res) => {
-    const connection = await db.getConnection();
+    let connection;
 
     try {
+        connection = await db.getConnection();
+
         await connection.beginTransaction();
 
         const [rows] = await connection.query(
@@ -406,16 +477,55 @@ const remove = async (req, res) => {
 
         if (rows.length === 0) {
             await connection.rollback();
+
             return res.status(404).json({
                 message: 'Reservation not found.'
             });
         }
 
         const reservation = rows[0];
+        const userRole = req.user.role;
 
-        if (reservation.status !== 'Confirmed' &&
-            reservation.status !== 'CheckedIn') {
+        // Only administrators and customers can cancel reservations.
+        if (!['admin', 'customer'].includes(userRole)) {
             await connection.rollback();
+
+            return res.status(403).json({
+                message: 'You do not have permission to cancel reservations.'
+            });
+        }
+
+        // Customers can only cancel their own reservations.
+        if (
+            userRole === 'customer' &&
+            !isOwner(reservation, req.user)
+        ) {
+            await connection.rollback();
+
+            return res.status(403).json({
+                message: 'You can only cancel your own reservations.'
+            });
+        }
+
+        // Customers can only cancel confirmed reservations.
+        if (
+            userRole === 'customer' &&
+            reservation.status !== 'Confirmed'
+        ) {
+            await connection.rollback();
+
+            return res.status(400).json({
+                message: 'Customers can only cancel confirmed reservations.'
+            });
+        }
+
+        // Administrators can cancel confirmed or checked-in reservations.
+        if (
+            userRole === 'admin' &&
+            !['Confirmed', 'CheckedIn'].includes(reservation.status)
+        ) {
+            await connection.rollback();
+
             return res.status(400).json({
                 message: 'This reservation cannot be cancelled.'
             });
@@ -428,7 +538,11 @@ const remove = async (req, res) => {
             [req.params.id]
         );
 
-        if (reservation.status === 'CheckedIn') {
+        // Release the seat if an administrator cancels a checked-in reservation.
+        if (
+            userRole === 'admin' &&
+            reservation.status === 'CheckedIn'
+        ) {
             await connection.query(
                 `UPDATE seats
                  SET status = 'Available'
@@ -439,19 +553,35 @@ const remove = async (req, res) => {
 
         await connection.commit();
 
-        res.status(200).json({
+        return res.status(200).json({
             message: 'Reservation cancelled successfully.',
             reservation_id: reservation.reservation_id,
             status: 'Cancelled'
         });
 
     } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: error.message });
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Cancellation rollback error:', rollbackError);
+            }
+        }
+
+        console.error('Reservation cancellation error:', error);
+
+        return res.status(500).json({
+            message: 'Failed to cancel reservation.'
+        });
+
     } finally {
-        connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };
+
+// Export reservation controller functions
 module.exports = {
     getAll,
     getById,
@@ -460,4 +590,4 @@ module.exports = {
     checkIn,
     checkOut,
     remove
-};
+ };

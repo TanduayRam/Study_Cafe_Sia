@@ -1,51 +1,742 @@
- 
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>Study Cafe Menu</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Café | Menu Management</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            background: #f7f3ec;
+            color: #302219;
+        }
+
+        /* SIDEBAR - COMPLETELY STATIONARY */
+
+        .sidebar {
+            width: 255px;
+            background: #302219;
+            color: #fffaf1;
+            padding: 30px 18px;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+
+            animation: none !important;
+            transform: none !important;
+        }
+
+        .brand {
+            font-size: 23px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .brand-subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #c9b8a4;
+            margin-bottom: 40px;
+        }
+
+        .nav-title {
+            font-size: 11px;
+            color: #b9a590;
+            margin: 15px 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links li {
+            margin-bottom: 8px;
+        }
+
+        .nav-links a {
+            display: block;
+            padding: 13px 15px;
+            color: #e9dfd2;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background 0.2s ease, color 0.2s ease;
+            font-size: 14px;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            background: #594332;
+            color: #ffffff;
+        }
+
+        .nav-icon {
+            display: inline-block;
+            width: 25px;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            border-top: 1px solid #514033;
+            padding-top: 20px;
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        /* MAIN LAYOUT */
+
+        .main-content {
+            margin-left: 255px;
+            padding: 35px 45px;
+
+            animation: none !important;
+            transform: none !important;
+        }
+
+        /* TOPBAR - COMPLETELY STATIONARY */
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 35px;
+
+            animation: none !important;
+            transform: none !important;
+        }
+
+        .topbar h1 {
+            font-size: 28px;
+            color: #302219;
+        }
+
+        .topbar p {
+            color: #897b6b;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+
+        .admin-label {
+            background: #e9dfd2;
+            color: #594332;
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* CONTENT ANIMATIONS - CONTENT ONLY */
+
+        @keyframes contentFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .welcome,
+        .summary-card,
+        .form-section,
+        .table-section {
+            animation: contentFadeUp 0.4s ease both;
+        }
+
+        .welcome {
+            animation-delay: 0.05s;
+        }
+
+        .summary-card {
+            animation-delay: 0.10s;
+        }
+
+        .form-section {
+            animation-delay: 0.15s;
+        }
+
+        .table-section {
+            animation-delay: 0.20s;
+        }
+
+        /* WELCOME */
+
+        .welcome {
+            margin-bottom: 25px;
+        }
+
+        .welcome h2 {
+            font-size: 23px;
+            margin-bottom: 7px;
+        }
+
+        .welcome p {
+            color: #897b6b;
+            font-size: 14px;
+        }
+
+        /* SUMMARY CARD */
+
+        .summary-card {
+            background: #ffffff;
+            border-radius: 13px;
+            padding: 25px;
+            width: 260px;
+            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
+            margin-bottom: 30px;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(48, 34, 25, 0.09);
+        }
+
+        .summary-card p {
+            color: #897b6b;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .summary-card h2 {
+            font-size: 32px;
+            color: #594332;
+        }
+
+        /* FORM AND TABLE CARDS */
+
+        .content-card {
+            background: #ffffff;
+            border-radius: 13px;
+            padding: 28px;
+            margin-bottom: 28px;
+            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
+            transition: box-shadow 0.25s ease;
+        }
+
+        .content-card:hover {
+            box-shadow: 0 7px 20px rgba(48, 34, 25, 0.08);
+        }
+
+        .card-heading {
+            margin-bottom: 22px;
+        }
+
+        .card-heading h2 {
+            font-size: 19px;
+            margin-bottom: 6px;
+        }
+
+        .card-heading p {
+            color: #897b6b;
+            font-size: 13px;
+        }
+
+        /* FORM */
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #594332;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ded4c8;
+            border-radius: 7px;
+            outline: none;
+            font-size: 14px;
+            background: #fffdfa;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input:hover {
+            border-color: #b9a58f;
+        }
+
+        input:focus {
+            border-color: #9b7958;
+            box-shadow: 0 0 0 3px rgba(155, 121, 88, 0.12);
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+            flex-wrap: wrap;
+        }
+
+        /* BUTTONS */
+
+        button {
+            border: none;
+            padding: 11px 20px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s ease, transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        button:focus-visible {
+            outline: 3px solid rgba(137, 100, 71, 0.25);
+            outline-offset: 2px;
+        }
+
+        .save-btn {
+            background: #806044;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #63472f;
+            box-shadow: 0 4px 10px rgba(99, 71, 47, 0.15);
+        }
+
+        .cancel-btn {
+            background: #e9e2d9;
+            color: #594332;
+        }
+
+        .cancel-btn:hover {
+            background: #d9cdbf;
+        }
+
+        .edit-btn {
+            background: #e8dfcf;
+            color: #654b30;
+            margin-right: 5px;
+        }
+
+        .delete-btn {
+            background: #f6dddd;
+            color: #a33d3d;
+        }
+
+        .edit-btn:hover {
+            background: #d9c8ad;
+        }
+
+        .delete-btn:hover {
+            background: #efc6c6;
+        }
+
+        /* TABLE */
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 750px;
+        }
+
+        th {
+            background: #f5f0e9;
+            color: #594332;
+            text-align: left;
+            padding: 15px 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #eee8df;
+            font-size: 13px;
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: #fdfbf8;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* TABLE ROW ANIMATION */
+
+        @keyframes rowFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        tbody tr.row-animated {
+            animation: rowFadeIn 0.3s ease both;
+        }
+
+        /* STOCK STATUS */
+
+        .stock-status {
+            padding: 6px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .in-stock {
+            background: #e0f0e5;
+            color: #34734b;
+        }
+
+        .low-stock {
+            background: #fff0d6;
+            color: #a66c1b;
+        }
+
+        .out-stock {
+            background: #f8dddd;
+            color: #a33d3d;
+        }
+
+        #status {
+            color: #897b6b;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+
+        /* ACCESSIBILITY */
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 900px) {
+            .main-content {
+                padding: 25px;
+            }
+
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 650px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding: 20px;
+            }
+
+            .brand-subtitle {
+                margin-bottom: 15px;
+            }
+
+            .nav-title {
+                display: none;
+            }
+
+            .nav-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+
+            .nav-links li {
+                margin: 0;
+            }
+
+            .sidebar-bottom {
+                margin-top: 15px;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .summary-card {
+                width: 100%;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .content-card {
+                padding: 20px;
+            }
+        }
+    </style>
 </head>
+
 <body>
-    <h2>Explore Our Menu</h2>
 
-    <h3>Add something to the menu!</h3>
+    <!-- SIDEBAR -->
 
-    <form id="menuForm">
-        <input id="name" placeholder="Item Name" required>
-        <input id="category" placeholder="Category" required>
-        <input id="price" type="number" step="0.01" min="0" placeholder="Price" required>
-        <input id="stock" type="number" min="0" placeholder="Stock" required>
-        <input id="reorder_level" type="number" min="0" placeholder="Reorder Level" required>
+    <aside class="sidebar">
 
-        <button type="submit">Save Item</button>
-    </form>
+        <div class="brand">☕ Study Café</div>
+        <div class="brand-subtitle">Reservation & Management System</div>
 
-    <p id="status">Preparing your menu... wait lang..ehe.</p>
+        <div class="nav-title">Main Menu</div>
 
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Item Name</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Reorder Level</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="list"></tbody>
-    </table>
+        <ul class="nav-links">
+            <li>
+                <a href="user.html">
+                    <span class="nav-icon">▦</span>Dashboard
+                </a>
+            </li>
+
+            <li>
+                <a href="zones.html">
+                    <span class="nav-icon">▤</span>Study Zones
+                </a>
+            </li>
+
+            <li>
+                <a href="seats.html">
+                    <span class="nav-icon">▣</span>Seats
+                </a>
+            </li>
+
+            <li>
+                <a href="menu.html" class="active">
+                    <span class="nav-icon">☕</span>Menu Management
+                </a>
+            </li>
+
+            <li>
+                <a href="pass_packages.html">
+                    <span class="nav-icon">▧</span>Pass Packages
+                </a>
+            </li>
+
+            <li>
+                <a href="payments.html">
+                    <span class="nav-icon">₱</span>Payments
+                </a>
+            </li>
+
+            <li>
+                <a href="member_passes_report.html">
+                    <span class="nav-icon">📊</span>Member Passes Report
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-bottom">
+            <ul class="nav-links">
+                <li>
+                    <a href="login.html" title="Logout"
+                       onclick="localStorage.removeItem('user')">
+                        <span class="nav-icon">⇥</span>
+                        Logout
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+    </aside>
+
+    <!-- MAIN CONTENT -->
+
+    <main class="main-content">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+            <div>
+                <h1>Menu Management</h1>
+                <p>Manage your café food and beverage items.</p>
+            </div>
+
+            <div class="admin-label">Administrator</div>
+        </header>
+
+        <!-- WELCOME -->
+
+        <section class="welcome">
+            <h2>Explore Our Menu ☕</h2>
+            <p>Add, update, and manage the products offered by your Study Café.</p>
+        </section>
+
+        <!-- SUMMARY -->
+
+        <section class="summary-card">
+            <p>Total Menu Items</p>
+            <h2 id="menuCount">0</h2>
+        </section>
+
+        <!-- ADD / EDIT MENU ITEM -->
+
+        <section class="content-card form-section">
+
+            <div class="card-heading">
+                <h2 id="formTitle">Add Something to the Menu!</h2>
+                <p>Enter the details of your food or beverage item.</p>
+            </div>
+
+            <form id="menuForm">
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label for="name">Item Name</label>
+                        <input id="name" placeholder="Enter item name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <input id="category" placeholder="e.g. Food, Drinks" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="price">Price (₱)</label>
+                        <input id="price" type="number" step="0.01" min="0"
+                            placeholder="Enter price" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stock">Stock Quantity</label>
+                        <input id="stock" type="number" min="0" step="1"
+                            placeholder="Enter stock" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reorder_level">Reorder Level</label>
+                        <input id="reorder_level" type="number" min="0" step="1"
+                            placeholder="Enter reorder level" required>
+                    </div>
+
+                </div>
+
+                <div class="form-buttons">
+                    <button type="submit" class="save-btn">Save Item</button>
+
+                    <button type="button" id="cancelBtn" class="cancel-btn"
+                        style="display:none;" onclick="cancelEdit()">
+                        Cancel Editing
+                    </button>
+                </div>
+
+            </form>
+
+            <p id="status">Preparing your menu...</p>
+
+        </section>
+
+        <!-- MENU ITEMS TABLE -->
+
+        <section class="content-card table-section">
+
+            <div class="card-heading">
+                <h2>All Menu Items</h2>
+                <p>View and manage all available café products.</p>
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Stock</th>
+                            <th>Reorder Level</th>
+                            <th>Stock Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="list"></tbody>
+                </table>
+
+            </div>
+
+        </section>
+
+    </main>
 
     <script>
+
         let editingMenuItemId = null;
 
+        // LOAD MENU ITEMS
+
         async function loadMenu() {
+
             const status = document.getElementById('status');
             const list = document.getElementById('list');
 
             status.textContent = 'Getting your menu ready...';
 
             try {
+
                 const res = await fetch('/api/menu-items');
 
                 if (!res.ok) {
@@ -54,30 +745,79 @@
 
                 const items = await res.json();
 
-                list.innerHTML = items.map(item => `
-                    <tr>
-                        <td>${item.menu_item_id}</td>
-                        <td>${item.name}</td>
-                        <td>${item.category}</td>
-                        <td>${item.price}</td>
-                        <td>${item.stock}</td>
-                        <td>${item.reorder_level}</td>
-                        <td>
-                            <button onclick="editMenuItem(${item.menu_item_id})">Edit</button>
-                            <button onclick="deleteMenuItem(${item.menu_item_id})">Delete</button>
-                        </td>
-                    </tr>
-                `).join('');
+                // Sort menu items by ID in ascending order
+
+                items.sort((a, b) =>
+                    Number(a.menu_item_id) - Number(b.menu_item_id)
+                );
+
+                document.getElementById('menuCount').textContent = items.length;
+
+                list.innerHTML = items.map(item => {
+
+                    let stockClass = 'in-stock';
+                    let stockText = 'In Stock';
+
+                    if (Number(item.stock) === 0) {
+                        stockClass = 'out-stock';
+                        stockText = 'Out of Stock';
+                    } else if (Number(item.stock) <= Number(item.reorder_level)) {
+                        stockClass = 'low-stock';
+                        stockText = 'Low Stock';
+                    }
+
+                    return `
+                        <tr>
+                            <td>${item.menu_item_id}</td>
+                            <td>${item.name}</td>
+                            <td>${item.category}</td>
+                            <td>₱${Number(item.price).toFixed(2)}</td>
+                            <td>${item.stock}</td>
+                            <td>${item.reorder_level}</td>
+                            <td>
+                                <span class="stock-status ${stockClass}">
+                                    ${stockText}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="edit-btn"
+                                    onclick="editMenuItem(${item.menu_item_id})">
+                                    Edit
+                                </button>
+
+                                <button class="delete-btn"
+                                    onclick="deleteMenuItem(${item.menu_item_id})">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+
+                }).join('');
+
+                // Animate table rows one after another
+
+                document.querySelectorAll('#list tr').forEach((row, index) => {
+                    row.classList.add('row-animated');
+                    row.style.animationDelay = `${Math.min(index * 0.035, 0.35)}s`;
+                });
 
                 status.textContent = 'Your menu is ready!';
 
             } catch (error) {
+
                 status.textContent = error.message;
+
             }
+
         }
 
+        // EDIT MENU ITEM
+
         async function editMenuItem(id) {
+
             try {
+
                 const res = await fetch('/api/menu-items/' + id);
 
                 if (!res.ok) {
@@ -93,19 +833,47 @@
                 document.getElementById('reorder_level').value = item.reorder_level;
 
                 editingMenuItemId = id;
+
                 document.querySelector('#menuForm button[type="submit"]').textContent = 'Save Changes';
+                document.getElementById('cancelBtn').style.display = 'inline-block';
+                document.getElementById('formTitle').textContent = 'Edit Menu Item';
+
+                document.getElementById('menuForm').scrollIntoView({
+                    behavior: 'smooth'
+                });
 
             } catch (error) {
+
                 alert(error.message);
+
             }
+
         }
 
+        // CANCEL EDITING
+
+        function cancelEdit() {
+
+            editingMenuItemId = null;
+
+            document.getElementById('menuForm').reset();
+
+            document.querySelector('#menuForm button[type="submit"]').textContent = 'Save Item';
+            document.getElementById('cancelBtn').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Add Something to the Menu!';
+
+        }
+
+        // DELETE MENU ITEM
+
         async function deleteMenuItem(id) {
+
             if (!confirm('Are you sure you want to remove this menu item?')) {
                 return;
             }
 
             try {
+
                 const res = await fetch('/api/menu-items/' + id, {
                     method: 'DELETE'
                 });
@@ -117,22 +885,35 @@
                 }
 
                 alert('Menu item removed successfully!');
+
+                if (editingMenuItemId === id) {
+                    cancelEdit();
+                }
+
                 loadMenu();
 
             } catch (error) {
+
                 alert(error.message);
+
             }
+
         }
 
+        // CREATE / UPDATE MENU ITEM
+
         document.getElementById('menuForm').addEventListener('submit', async function(event) {
+
             event.preventDefault();
 
             const item = {
+
                 name: document.getElementById('name').value,
                 category: document.getElementById('category').value,
                 price: document.getElementById('price').value,
                 stock: document.getElementById('stock').value,
                 reorder_level: document.getElementById('reorder_level').value
+
             };
 
             const url = editingMenuItemId
@@ -142,12 +923,17 @@
             const method = editingMenuItemId ? 'PUT' : 'POST';
 
             try {
+
                 const res = await fetch(url, {
+
                     method: method,
+
                     headers: {
                         'Content-Type': 'application/json'
                     },
+
                     body: JSON.stringify(item)
+
                 });
 
                 const data = await res.json();
@@ -160,18 +946,22 @@
                     ? 'Your menu item has been updated!'
                     : 'Your new menu item is ready!');
 
-                editingMenuItemId = null;
-                document.getElementById('menuForm').reset();
-                document.querySelector('#menuForm button[type="submit"]').textContent = 'Save Item';
-
+                cancelEdit();
                 loadMenu();
 
             } catch (error) {
+
                 alert(error.message);
+
             }
+
         });
 
+        // INITIAL LOAD
+
         loadMenu();
+
     </script>
+
 </body>
 </html>
