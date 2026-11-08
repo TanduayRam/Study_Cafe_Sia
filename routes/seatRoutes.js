@@ -1,13 +1,14 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const seat = require('../controllers/seatController');
+const { authenticateToken, isAdmin, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const seatController = require('../controllers/seatController');
+router.use(authenticateToken);
 
-router.get('/', seatController.getAll);
-router.get('/without-active-reservation', seatController.getSeatsWithoutActiveReservation);
-router.get('/:id', seatController.getById);
-router.post('/', seatController.create);
-router.put('/:id', seatController.update);
-router.delete('/:id', seatController.remove);
+router.get('/', seat.getAll);
+router.get('/:id', seat.getById);
+router.post('/', isAdmin, seat.create);
+router.put('/:id', isAdminOrStaff, seat.update);
+router.patch('/:id', isAdminOrStaff, seat.update);
+router.delete('/:id', isAdmin, seat.remove);
 
 module.exports = router;
