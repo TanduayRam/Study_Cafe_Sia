@@ -31,6 +31,14 @@ CREATE TABLE users (
 );
 
 
+--TOKEN BLACKLIST TABLE
+CREATE TABLE token_blacklist (
+    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- =========================================
 -- MEMBER D: PASS PACKAGES AND MEMBER PASSES
 -- =========================================
