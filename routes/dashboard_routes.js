@@ -1,10 +1,7 @@
+const router = require('express').Router();
+const dashboard = require('../controllers/dashboard_controller');
+const { authenticateToken, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const express = require('express');
-const router = express.Router();
-
-const dashboardController = require('../controllers/dashboard_controller');
-
-
-router.get('/summary', dashboardController.getDashboardSummary);
+router.get('/summary', authenticateToken, isAdminOrStaff, dashboard.getSummary);
 
 module.exports = router;

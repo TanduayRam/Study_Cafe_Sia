@@ -1,51 +1,56 @@
+const db = require('../config/databases');
 
-const db = require('../config/javier_database');
+// Collects the numbers for the dashboard. Every number falls back to 0,
+// so an empty database never crashes the page.
+async function getSummary() {
+    const [sessions] = await db.query("SELECT COUNT(*) AS total FROM session_logs WHERE status = 'Active'");
+    const [seats] = await db.query("SELECT COUNT(*) AS total FROM seats WHERE status = 'Available'");
+    const [alerts] = await db.query("SELECT COUNT(*) AS total FROM alerts WHERE status = 'Open'");
+    const [lowStock] = await db.query('SELECT COUNT(*) AS total FROM menu_items WHERE stock <= reorder_level');
+    const [revenue] = await db.query(
+        `SELECT COALESCE(SUM(total_amount), 0) AS total, COALESCE(SUM(cash_amount), 0) AS cash
+         FROM payments
+         WHERE status = 'Paid' AND DATE(paid_at) = UTC_DATE()`
+    );
+    const [rating] = await db.query('SELECT COALESCE(ROUND(AVG(rating), 2), 0) AS average FROM feedback_reviews');
 
-const getDashboardSummary = async () => {
+    // Occupancy of each zone.
+    const [zones] = await db.query(
+        `SELECT z.zone_id, z.name, z.capacity,
+                COUNT(CASE WHEN s.status = 'Occupied' THEN 1 END) AS occupied
+         FROM study_zones z
+         LEFT JOIN seats s ON s.zone_id = z.zone_id
+         GROUP BY z.zone_id, z.name, z.capacity
+         ORDER BY z.zone_id`
+    );
 
-    const [activeSessions] = await db.execute(`
-        SELECT COUNT(*) AS total
-        FROM session_logs
-        WHERE ended_at IS NULL
-    `);
+    const zoneList = [];
+    for (let i = 0; i < zones.length; i++) {
+        const occupied = Number(zones[i].occupied);
+        let percent = 0;
+        if (zones[i].capacity > 0) {
+            percent = Math.round((occupied / zones[i].capacity) * 100);
+        }
 
-    const [availableSeats] = await db.execute(`
-        SELECT COUNT(*) AS total
-        FROM seats
-        WHERE status = 'available'
-    `);
-
-    const [openAlerts] = await db.execute(`
-        SELECT COUNT(*) AS total
-        FROM alerts
-        WHERE is_resolved = FALSE
-    `);
-
-    const [todaysRevenue] = await db.execute(`
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM payments
-        WHERE DATE(paid_at) = CURDATE()
-    `);
-
-    const [averageRating] = await db.execute(`
-        SELECT COALESCE(AVG(rating), 0) AS average
-        FROM feedback_reviews
-    `);
+        zoneList.push({
+            zone_id: zones[i].zone_id,
+            name: zones[i].name,
+            capacity: zones[i].capacity,
+            occupied: occupied,
+            percent: percent
+        });
+    }
 
     return {
-        active_sessions: activeSessions[0].total,
-        available_seats: availableSeats[0].total,
-        open_alerts: openAlerts[0].total,
-        low_stock_items: null,
-        todays_revenue: Number(todaysRevenue[0].total),
-        average_rating: Number(averageRating[0].average),
-
-        unavailable_metrics: [
-            'low_stock_items'
-        ]
+        active_sessions: Number(sessions[0].total),
+        available_seats: Number(seats[0].total),
+        open_alerts: Number(alerts[0].total),
+        low_stock_items: Number(lowStock[0].total),
+        todays_revenue: Number(revenue[0].total),
+        todays_cash: Number(revenue[0].cash),
+        average_rating: Number(rating[0].average),
+        zone_occupancy: zoneList
     };
-};
+}
 
-module.exports = {
-    getDashboardSummary
-};
+module.exports = { getSummary: getSummary };

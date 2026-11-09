@@ -1,41 +1,33 @@
-const db = require('../config/javier_database');
+const db = require('../config/databases');
 
-const createSnapshot = async (title, reportData) => {
-    const sql = `
-        INSERT INTO report_snapshots (title, report_data)
-        VALUES (?, ?)
-    `;
+// created_by_name shows "System" when created_by is empty.
+const SELECT_SNAPSHOT =
+    "SELECT sn.snapshot_id, sn.title, sn.report_data, sn.created_by, " +
+    "COALESCE(u.name, 'System') AS created_by_name, sn.created_at " +
+    "FROM report_snapshots sn LEFT JOIN users u ON sn.created_by = u.user_id";
 
-    const [result] = await db.execute(sql, [
-        title,
-        JSON.stringify(reportData)
-    ]);
-
-    return result.insertId;
-};
-
-const getAllSnapshots = async () => {
-    const sql = `
-        SELECT * FROM report_snapshots
-        ORDER BY created_at DESC
-    `;
-
-    const [rows] = await db.execute(sql);
+async function getAll() {
+    const [rows] = await db.query(SELECT_SNAPSHOT + ' ORDER BY sn.snapshot_id DESC');
     return rows;
-};
+}
 
-const deleteSnapshot = async (snapshotId) => {
-    const sql = `
-        DELETE FROM report_snapshots
-        WHERE snapshot_id = ?
-    `;
+async function getById(id) {
+    const [rows] = await db.query(SELECT_SNAPSHOT + ' WHERE sn.snapshot_id = ?', [id]);
+    return rows[0];
+}
 
-    const [result] = await db.execute(sql, [snapshotId]);
-    return result.affectedRows;
-};
+// The report data is saved as JSON text.
+async function create(title, reportData, userId) {
+    const [result] = await db.query(
+        'INSERT INTO report_snapshots (title, report_data, created_by) VALUES (?, ?, ?)',
+        [title, JSON.stringify(reportData), userId]
+    );
+    return getById(result.insertId);
+}
 
-module.exports = {
-    createSnapshot,
-    getAllSnapshots,
-    deleteSnapshot
-};
+async function remove(id) {
+    const [result] = await db.query('DELETE FROM report_snapshots WHERE snapshot_id = ?', [id]);
+    return result.affectedRows > 0;
+}
+
+module.exports = { getAll: getAll, getById: getById, create: create, remove: remove };

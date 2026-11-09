@@ -1,56 +1,126 @@
 const Review = require('../models/feedback_review_model');
+const reservationModel = require('../models/reservationModel');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-exports.createReview = async (req, res) => {
+// Checks the rating (1 to 5) and the comment. Returns clean values.
+function cleanRatingAndComment(body) {
+    const rating = Number(body.rating);
+
+    if (isBlank(body.rating) || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw createError(400, 'Rating must be a whole number from 1 to 5.');
+    }
+    if (isBlank(body.comment) === false && String(body.comment).length > 500) {
+        throw createError(400, 'Comment must be 500 characters or fewer.');
+    }
+
+    let comment = null;
+    if (isBlank(body.comment) === false) {
+        comment = String(body.comment).trim();
+    }
+
+    return { rating: rating, comment: comment };
+}
+
+// Finds the review from the address. Throws 404 if it does not exist.
+async function loadReview(req) {
+    const review = await Review.getById(toId(req.params.id, 'Review ID'));
+
+    if (!review) {
+        throw createError(404, 'Review not found.');
+    }
+    return review;
+}
+
+// Only the person who wrote the review, or an Admin, may change or delete it.
+function checkCanChange(review, user) {
+    if (user.role !== 'Admin' && review.user_id !== user.user_id) {
+        throw createError(403, 'You can only change your own reviews.');
+    }
+}
+
+// GET /reviews
+exports.getAll = async function (req, res, next) {
     try {
-        const { reservation_id, rating, comment } = req.body;
-        const member_id = req.user.member_id;
+        const reviews = await Review.getAll();
+        return sendSuccess(res, reviews, 'Reviews retrieved.');
+    } catch (error) {
+        next(error);
+    }
+};
 
-        if (!reservation_id || !rating || rating < 1 || rating > 5) {
-            return res.status(400).json({ error: 'Invalid review details' });
+// GET /reviews/:id
+exports.getById = async function (req, res, next) {
+    try {
+        const review = await loadReview(req);
+        return sendSuccess(res, review, 'Review retrieved.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /reviews   with { reservation_id, rating, comment }
+// The reviewer is the logged-in user (taken from the token).
+exports.create = async function (req, res, next) {
+    try {
+        const body = req.body || {};
+        const reservationId = toId(body.reservation_id, 'Reservation ID');
+        const clean = cleanRatingAndComment(body);
+
+        const reservation = await reservationModel.getById(reservationId);
+
+        if (!reservation) {
+            throw createError(404, 'Reservation not found.');
+        }
+        if (req.user.role === 'Member' && reservation.user_id !== req.user.user_id) {
+            throw createError(403, 'You can only review your own reservations.');
+        }
+        if (reservation.status !== 'Completed') {
+            throw createError(400, 'You can only review a Completed reservation.');
         }
 
-        const id = await Review.createReview(
-            reservation_id, member_id, rating, comment
-        );
+        // One review per reservation.
+        const already = await Review.getByReservation(reservationId);
+        if (already) {
+            throw createError(400, 'This reservation already has a review.');
+        }
 
-        res.status(201).json({ message: 'Review created', id });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const review = await Review.create({
+            reservation_id: reservationId,
+            user_id: req.user.user_id,
+            rating: clean.rating,
+            comment: clean.comment
+        });
+
+        return sendSuccess(res, review, 'Thank you! Your review was saved.', 201);
+    } catch (error) {
+        next(error);
     }
 };
 
-exports.getReviews = async (req, res) => {
+// PUT /reviews/:id
+exports.update = async function (req, res, next) {
     try {
-        res.json(await Review.getAllReviews());
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const review = await loadReview(req);
+        checkCanChange(review, req.user);
+
+        const clean = cleanRatingAndComment(req.body || {});
+        const updated = await Review.update(review.review_id, clean);
+
+        return sendSuccess(res, updated, 'Review updated.');
+    } catch (error) {
+        next(error);
     }
 };
 
-exports.getReview = async (req, res) => {
+// DELETE /reviews/:id
+exports.remove = async function (req, res, next) {
     try {
-        res.json(await Review.getReviewById(req.params.id));
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
+        const review = await loadReview(req);
+        checkCanChange(review, req.user);
 
-exports.updateReview = async (req, res) => {
-    try {
-        await Review.updateReview(
-            req.params.id, req.body.rating, req.body.comment
-        );
-        res.json({ message: 'Review updated' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-
-exports.deleteReview = async (req, res) => {
-    try {
-        await Review.deleteReview(req.params.id);
-        res.json({ message: 'Review deleted' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        await Review.remove(review.review_id);
+        return sendSuccess(res, { review_id: review.review_id }, 'Review deleted.');
+    } catch (error) {
+        next(error);
     }
 };
