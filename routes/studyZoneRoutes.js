@@ -1,12 +1,13 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const zone = require('../controllers/studyZoneController');
+const { authenticateToken, isAdmin } = require('../middleware/auth_middleware');
 
-const studyZoneController = require('../controllers/studyZoneController');
+router.use(authenticateToken);
 
-router.get('/', studyZoneController.getAll);
-router.get('/:id', studyZoneController.getById);
-router.post('/', studyZoneController.create);
-router.put('/:id', studyZoneController.update);
-router.delete('/:id', studyZoneController.remove);
+router.get('/', zone.getAll);
+router.get('/:id', zone.getById);
+router.post('/', isAdmin, zone.create);
+router.put('/:id', isAdmin, zone.update);
+router.delete('/:id', isAdmin, zone.remove);
 
 module.exports = router;

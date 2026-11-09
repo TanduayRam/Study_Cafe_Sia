@@ -1,967 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Café | Menu Management</title>
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        body {
-            background: #f7f3ec;
-            color: #302219;
-        }
-
-        /* SIDEBAR - COMPLETELY STATIONARY */
-
-        .sidebar {
-            width: 255px;
-            background: #302219;
-            color: #fffaf1;
-            padding: 30px 18px;
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            z-index: 10;
-
-            animation: none !important;
-            transform: none !important;
-        }
-
-        .brand {
-            font-size: 23px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-
-        .brand-subtitle {
-            text-align: center;
-            font-size: 12px;
-            color: #c9b8a4;
-            margin-bottom: 40px;
-        }
-
-        .nav-title {
-            font-size: 11px;
-            color: #b9a590;
-            margin: 15px 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .nav-links {
-            list-style: none;
-        }
-
-        .nav-links li {
-            margin-bottom: 8px;
-        }
-
-        .nav-links a {
-            display: block;
-            padding: 13px 15px;
-            color: #e9dfd2;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: background 0.2s ease, color 0.2s ease;
-            font-size: 14px;
-        }
-
-        .nav-links a:hover,
-        .nav-links a.active {
-            background: #594332;
-            color: #ffffff;
-        }
-
-        .nav-icon {
-            display: inline-block;
-            width: 25px;
-        }
-
-        .sidebar-bottom {
-            margin-top: auto;
-            border-top: 1px solid #514033;
-            padding-top: 20px;
-            padding-bottom: 10px;
-            flex-shrink: 0;
-        }
-
-        /* MAIN LAYOUT */
-
-        .main-content {
-            margin-left: 255px;
-            padding: 35px 45px;
-
-            animation: none !important;
-            transform: none !important;
-        }
-
-        /* TOPBAR - COMPLETELY STATIONARY */
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 35px;
-
-            animation: none !important;
-            transform: none !important;
-        }
-
-        .topbar h1 {
-            font-size: 28px;
-            color: #302219;
-        }
-
-        .topbar p {
-            color: #897b6b;
-            margin-top: 5px;
-            font-size: 14px;
-        }
-
-        .admin-label {
-            background: #e9dfd2;
-            color: #594332;
-            padding: 10px 18px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        /* CONTENT ANIMATIONS - CONTENT ONLY */
-
-        @keyframes contentFadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(14px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .welcome,
-        .summary-card,
-        .form-section,
-        .table-section {
-            animation: contentFadeUp 0.4s ease both;
-        }
-
-        .welcome {
-            animation-delay: 0.05s;
-        }
-
-        .summary-card {
-            animation-delay: 0.10s;
-        }
-
-        .form-section {
-            animation-delay: 0.15s;
-        }
-
-        .table-section {
-            animation-delay: 0.20s;
-        }
-
-        /* WELCOME */
-
-        .welcome {
-            margin-bottom: 25px;
-        }
-
-        .welcome h2 {
-            font-size: 23px;
-            margin-bottom: 7px;
-        }
-
-        .welcome p {
-            color: #897b6b;
-            font-size: 14px;
-        }
-
-        /* SUMMARY CARD */
-
-        .summary-card {
-            background: #ffffff;
-            border-radius: 13px;
-            padding: 25px;
-            width: 260px;
-            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
-            margin-bottom: 30px;
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .summary-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(48, 34, 25, 0.09);
-        }
-
-        .summary-card p {
-            color: #897b6b;
-            font-size: 13px;
-            margin-bottom: 12px;
-        }
-
-        .summary-card h2 {
-            font-size: 32px;
-            color: #594332;
-        }
-
-        /* FORM AND TABLE CARDS */
-
-        .content-card {
-            background: #ffffff;
-            border-radius: 13px;
-            padding: 28px;
-            margin-bottom: 28px;
-            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
-            transition: box-shadow 0.25s ease;
-        }
-
-        .content-card:hover {
-            box-shadow: 0 7px 20px rgba(48, 34, 25, 0.08);
-        }
-
-        .card-heading {
-            margin-bottom: 22px;
-        }
-
-        .card-heading h2 {
-            font-size: 19px;
-            margin-bottom: 6px;
-        }
-
-        .card-heading p {
-            color: #897b6b;
-            font-size: 13px;
-        }
-
-        /* FORM */
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 18px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-group label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #594332;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ded4c8;
-            border-radius: 7px;
-            outline: none;
-            font-size: 14px;
-            background: #fffdfa;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        input:hover {
-            border-color: #b9a58f;
-        }
-
-        input:focus {
-            border-color: #9b7958;
-            box-shadow: 0 0 0 3px rgba(155, 121, 88, 0.12);
-        }
-
-        .form-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 22px;
-            flex-wrap: wrap;
-        }
-
-        /* BUTTONS */
-
-        button {
-            border: none;
-            padding: 11px 20px;
-            border-radius: 7px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: background 0.2s ease, transform 0.2s ease,
-                box-shadow 0.2s ease;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-        }
-
-        button:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        button:focus-visible {
-            outline: 3px solid rgba(137, 100, 71, 0.25);
-            outline-offset: 2px;
-        }
-
-        .save-btn {
-            background: #806044;
-            color: white;
-        }
-
-        .save-btn:hover {
-            background: #63472f;
-            box-shadow: 0 4px 10px rgba(99, 71, 47, 0.15);
-        }
-
-        .cancel-btn {
-            background: #e9e2d9;
-            color: #594332;
-        }
-
-        .cancel-btn:hover {
-            background: #d9cdbf;
-        }
-
-        .edit-btn {
-            background: #e8dfcf;
-            color: #654b30;
-            margin-right: 5px;
-        }
-
-        .delete-btn {
-            background: #f6dddd;
-            color: #a33d3d;
-        }
-
-        .edit-btn:hover {
-            background: #d9c8ad;
-        }
-
-        .delete-btn:hover {
-            background: #efc6c6;
-        }
-
-        /* TABLE */
-
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 750px;
-        }
-
-        th {
-            background: #f5f0e9;
-            color: #594332;
-            text-align: left;
-            padding: 15px 12px;
-            font-size: 12px;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        td {
-            padding: 15px 12px;
-            border-bottom: 1px solid #eee8df;
-            font-size: 13px;
-        }
-
-        tbody tr {
-            transition: background 0.2s ease;
-        }
-
-        tbody tr:hover {
-            background: #fdfbf8;
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* TABLE ROW ANIMATION */
-
-        @keyframes rowFadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        tbody tr.row-animated {
-            animation: rowFadeIn 0.3s ease both;
-        }
-
-        /* STOCK STATUS */
-
-        .stock-status {
-            padding: 6px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .in-stock {
-            background: #e0f0e5;
-            color: #34734b;
-        }
-
-        .low-stock {
-            background: #fff0d6;
-            color: #a66c1b;
-        }
-
-        .out-stock {
-            background: #f8dddd;
-            color: #a33d3d;
-        }
-
-        #status {
-            color: #897b6b;
-            font-size: 13px;
-            margin-top: 15px;
-        }
-
-        /* ACCESSIBILITY */
-
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-                scroll-behavior: auto !important;
-            }
-        }
-
-        /* RESPONSIVE */
-
-        @media (max-width: 900px) {
-            .main-content {
-                padding: 25px;
-            }
-
-            .form-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 650px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-                padding: 20px;
-            }
-
-            .brand-subtitle {
-                margin-bottom: 15px;
-            }
-
-            .nav-title {
-                display: none;
-            }
-
-            .nav-links {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-            }
-
-            .nav-links li {
-                margin: 0;
-            }
-
-            .sidebar-bottom {
-                margin-top: 15px;
-            }
-
-            .main-content {
-                margin-left: 0;
-                padding: 20px;
-            }
-
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .summary-card {
-                width: 100%;
-            }
-
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .content-card {
-                padding: 20px;
-            }
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Menu</title>
+<link rel="stylesheet" href="app.css">
 </head>
-
 <body>
-
-    <!-- SIDEBAR -->
-
-    <aside class="sidebar">
-
-        <div class="brand">☕ Study Café</div>
-        <div class="brand-subtitle">Reservation & Management System</div>
-
-        <div class="nav-title">Main Menu</div>
-
-        <ul class="nav-links">
-            <li>
-                <a href="user.html">
-                    <span class="nav-icon">▦</span>Dashboard
-                </a>
-            </li>
-
-            <li>
-                <a href="zones.html">
-                    <span class="nav-icon">▤</span>Study Zones
-                </a>
-            </li>
-
-            <li>
-                <a href="seats.html">
-                    <span class="nav-icon">▣</span>Seats
-                </a>
-            </li>
-
-            <li>
-                <a href="menu.html" class="active">
-                    <span class="nav-icon">☕</span>Menu Management
-                </a>
-            </li>
-
-            <li>
-                <a href="pass_packages.html">
-                    <span class="nav-icon">▧</span>Pass Packages
-                </a>
-            </li>
-
-            <li>
-                <a href="payments.html">
-                    <span class="nav-icon">₱</span>Payments
-                </a>
-            </li>
-
-            <li>
-                <a href="member_passes_report.html">
-                    <span class="nav-icon">📊</span>Member Passes Report
-                </a>
-            </li>
-        </ul>
-
-        <div class="sidebar-bottom">
-            <ul class="nav-links">
-                <li>
-                    <a href="login.html" title="Logout"
-                       onclick="localStorage.removeItem('user')">
-                        <span class="nav-icon">⇥</span>
-                        Logout
-                    </a>
-                </li>
-            </ul>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Menu</h1>
+            <div class="who" id="who"></div>
         </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card" id="formCard">
+    <h2 id="formTitle">Add a menu item</h2>
+    <div class="row">
+        <div><label>Item name</label><input id="nameInput"></div>
+        <div><label>Category</label><input id="categoryInput"></div>
+        <div><label>Price (pesos)</label><input id="priceInput" type="number" step="any"></div>
+        <div><label>Stock</label><input id="stockInput" type="number"></div>
+        <div><label>Reorder level</label><input id="reorderInput" type="number" value="5"></div>
+    </div>
+    <div style="margin-top:12px">
+        <button class="btn primary" onclick="saveItem()">Save</button>
+        <button class="btn" onclick="clearForm()">Clear</button>
+    </div>
+</div>
 
-    </aside>
+<div class="card">
+    <h2>Food, drinks and supplies</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Reorder at</th><th>Stock status</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
 
-    <!-- MAIN CONTENT -->
+<script src="api.js"></script>
+<script>
+var items = [];
+var editingId = null;
+var role = '';
 
-    <main class="main-content">
+async function loadItems() {
+    try {
+        showLoading();
+        var result = await callApi('/menu-items');
+        items = result.data;
 
-        <!-- TOPBAR -->
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var m = items[i];
 
-        <header class="topbar">
-            <div>
-                <h1>Menu Management</h1>
-                <p>Manage your café food and beverage items.</p>
-            </div>
-
-            <div class="admin-label">Administrator</div>
-        </header>
-
-        <!-- WELCOME -->
-
-        <section class="welcome">
-            <h2>Explore Our Menu ☕</h2>
-            <p>Add, update, and manage the products offered by your Study Café.</p>
-        </section>
-
-        <!-- SUMMARY -->
-
-        <section class="summary-card">
-            <p>Total Menu Items</p>
-            <h2 id="menuCount">0</h2>
-        </section>
-
-        <!-- ADD / EDIT MENU ITEM -->
-
-        <section class="content-card form-section">
-
-            <div class="card-heading">
-                <h2 id="formTitle">Add Something to the Menu!</h2>
-                <p>Enter the details of your food or beverage item.</p>
-            </div>
-
-            <form id="menuForm">
-
-                <div class="form-grid">
-
-                    <div class="form-group">
-                        <label for="name">Item Name</label>
-                        <input id="name" placeholder="Enter item name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="category">Category</label>
-                        <input id="category" placeholder="e.g. Food, Drinks" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="price">Price (₱)</label>
-                        <input id="price" type="number" step="0.01" min="0"
-                            placeholder="Enter price" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="stock">Stock Quantity</label>
-                        <input id="stock" type="number" min="0" step="1"
-                            placeholder="Enter stock" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="reorder_level">Reorder Level</label>
-                        <input id="reorder_level" type="number" min="0" step="1"
-                            placeholder="Enter reorder level" required>
-                    </div>
-
-                </div>
-
-                <div class="form-buttons">
-                    <button type="submit" class="save-btn">Save Item</button>
-
-                    <button type="button" id="cancelBtn" class="cancel-btn"
-                        style="display:none;" onclick="cancelEdit()">
-                        Cancel Editing
-                    </button>
-                </div>
-
-            </form>
-
-            <p id="status">Preparing your menu...</p>
-
-        </section>
-
-        <!-- MENU ITEMS TABLE -->
-
-        <section class="content-card table-section">
-
-            <div class="card-heading">
-                <h2>All Menu Items</h2>
-                <p>View and manage all available café products.</p>
-            </div>
-
-            <div class="table-wrapper">
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Item Name</th>
-                            <th>Category</th>
-                            <th>Price</th>
-                            <th>Stock</th>
-                            <th>Reorder Level</th>
-                            <th>Stock Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-
-                    <tbody id="list"></tbody>
-                </table>
-
-            </div>
-
-        </section>
-
-    </main>
-
-    <script>
-
-        let editingMenuItemId = null;
-
-        // LOAD MENU ITEMS
-
-        async function loadMenu() {
-
-            const status = document.getElementById('status');
-            const list = document.getElementById('list');
-
-            status.textContent = 'Getting your menu ready...';
-
-            try {
-
-                const res = await fetch('/api/menu-items');
-
-                if (!res.ok) {
-                    throw new Error('Unable to load menu items.');
-                }
-
-                const items = await res.json();
-
-                // Sort menu items by ID in ascending order
-
-                items.sort((a, b) =>
-                    Number(a.menu_item_id) - Number(b.menu_item_id)
-                );
-
-                document.getElementById('menuCount').textContent = items.length;
-
-                list.innerHTML = items.map(item => {
-
-                    let stockClass = 'in-stock';
-                    let stockText = 'In Stock';
-
-                    if (Number(item.stock) === 0) {
-                        stockClass = 'out-stock';
-                        stockText = 'Out of Stock';
-                    } else if (Number(item.stock) <= Number(item.reorder_level)) {
-                        stockClass = 'low-stock';
-                        stockText = 'Low Stock';
-                    }
-
-                    return `
-                        <tr>
-                            <td>${item.menu_item_id}</td>
-                            <td>${item.name}</td>
-                            <td>${item.category}</td>
-                            <td>₱${Number(item.price).toFixed(2)}</td>
-                            <td>${item.stock}</td>
-                            <td>${item.reorder_level}</td>
-                            <td>
-                                <span class="stock-status ${stockClass}">
-                                    ${stockText}
-                                </span>
-                            </td>
-                            <td>
-                                <button class="edit-btn"
-                                    onclick="editMenuItem(${item.menu_item_id})">
-                                    Edit
-                                </button>
-
-                                <button class="delete-btn"
-                                    onclick="deleteMenuItem(${item.menu_item_id})">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-
-                }).join('');
-
-                // Animate table rows one after another
-
-                document.querySelectorAll('#list tr').forEach((row, index) => {
-                    row.classList.add('row-animated');
-                    row.style.animationDelay = `${Math.min(index * 0.035, 0.35)}s`;
-                });
-
-                status.textContent = 'Your menu is ready!';
-
-            } catch (error) {
-
-                status.textContent = error.message;
-
+            var stockStatus = '<span class="badge b-green">OK</span>';
+            if (m.low_stock) {
+                stockStatus = '<span class="badge b-red">Low stock</span>';
             }
 
+            var buttons = '';
+            if (role === 'Admin' || role === 'Staff') {
+                buttons = '<button class="btn small" onclick="editItem(' + m.item_id + ')">Edit</button> ';
+            }
+            if (role === 'Admin') {
+                buttons = buttons + '<button class="btn small danger" onclick="deleteItem(' + m.item_id + ')">Delete</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + m.item_id + '</td>' +
+                '<td>' + escapeHtml(m.name) + '</td>' +
+                '<td>' + escapeHtml(m.category) + '</td>' +
+                '<td>' + formatMoney(m.price) + '</td>' +
+                '<td>' + m.stock + '</td>' +
+                '<td>' + m.reorder_level + '</td>' +
+                '<td>' + stockStatus + '</td>' +
+                '<td class="actions">' + buttons + '</td></tr>';
+        }
+        if (items.length === 0) {
+            html = '<tr><td colspan="8" class="empty">No menu items found.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+function clearForm() {
+    editingId = null;
+    document.getElementById('formTitle').textContent = 'Add a menu item';
+    document.getElementById('nameInput').value = '';
+    document.getElementById('categoryInput').value = '';
+    document.getElementById('priceInput').value = '';
+    document.getElementById('stockInput').value = '';
+    document.getElementById('reorderInput').value = '5';
+}
+
+function editItem(id) {
+    var m = findById(items, 'item_id', id);
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit menu item #' + id;
+    document.getElementById('nameInput').value = m.name;
+    document.getElementById('categoryInput').value = m.category;
+    document.getElementById('priceInput').value = m.price;
+    document.getElementById('stockInput').value = m.stock;
+    document.getElementById('reorderInput').value = m.reorder_level;
+    window.scrollTo(0, 0);
+}
+
+async function saveItem() {
+    try {
+        var body = {
+            name: document.getElementById('nameInput').value,
+            category: document.getElementById('categoryInput').value,
+            price: document.getElementById('priceInput').value,
+            stock: document.getElementById('stockInput').value,
+            reorder_level: document.getElementById('reorderInput').value
+        };
+
+        var result;
+        if (editingId === null) {
+            result = await callApi('/menu-items', 'POST', body);
+        } else {
+            result = await callApi('/menu-items/' + editingId, 'PUT', body);
         }
 
-        // EDIT MENU ITEM
+        showMessage(result.message, false);
+        clearForm();
+        loadItems();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
 
-        async function editMenuItem(id) {
+async function deleteItem(id) {
+    if (confirm('Delete this menu item?') === false) {
+        return;
+    }
+    try {
+        var result = await callApi('/menu-items/' + id, 'DELETE');
+        showMessage(result.message, false);
+        loadItems();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
 
-            try {
-
-                const res = await fetch('/api/menu-items/' + id);
-
-                if (!res.ok) {
-                    throw new Error('Unable to load item details.');
-                }
-
-                const item = await res.json();
-
-                document.getElementById('name').value = item.name;
-                document.getElementById('category').value = item.category;
-                document.getElementById('price').value = item.price;
-                document.getElementById('stock').value = item.stock;
-                document.getElementById('reorder_level').value = item.reorder_level;
-
-                editingMenuItemId = id;
-
-                document.querySelector('#menuForm button[type="submit"]').textContent = 'Save Changes';
-                document.getElementById('cancelBtn').style.display = 'inline-block';
-                document.getElementById('formTitle').textContent = 'Edit Menu Item';
-
-                document.getElementById('menuForm').scrollIntoView({
-                    behavior: 'smooth'
-                });
-
-            } catch (error) {
-
-                alert(error.message);
-
-            }
-
-        }
-
-        // CANCEL EDITING
-
-        function cancelEdit() {
-
-            editingMenuItemId = null;
-
-            document.getElementById('menuForm').reset();
-
-            document.querySelector('#menuForm button[type="submit"]').textContent = 'Save Item';
-            document.getElementById('cancelBtn').style.display = 'none';
-            document.getElementById('formTitle').textContent = 'Add Something to the Menu!';
-
-        }
-
-        // DELETE MENU ITEM
-
-        async function deleteMenuItem(id) {
-
-            if (!confirm('Are you sure you want to remove this menu item?')) {
-                return;
-            }
-
-            try {
-
-                const res = await fetch('/api/menu-items/' + id, {
-                    method: 'DELETE'
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.message || 'Unable to remove menu item.');
-                }
-
-                alert('Menu item removed successfully!');
-
-                if (editingMenuItemId === id) {
-                    cancelEdit();
-                }
-
-                loadMenu();
-
-            } catch (error) {
-
-                alert(error.message);
-
-            }
-
-        }
-
-        // CREATE / UPDATE MENU ITEM
-
-        document.getElementById('menuForm').addEventListener('submit', async function(event) {
-
-            event.preventDefault();
-
-            const item = {
-
-                name: document.getElementById('name').value,
-                category: document.getElementById('category').value,
-                price: document.getElementById('price').value,
-                stock: document.getElementById('stock').value,
-                reorder_level: document.getElementById('reorder_level').value
-
-            };
-
-            const url = editingMenuItemId
-                ? '/api/menu-items/' + editingMenuItemId
-                : '/api/menu-items';
-
-            const method = editingMenuItemId ? 'PUT' : 'POST';
-
-            try {
-
-                const res = await fetch(url, {
-
-                    method: method,
-
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-
-                    body: JSON.stringify(item)
-
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.message || 'Unable to save menu item.');
-                }
-
-                alert(editingMenuItemId
-                    ? 'Your menu item has been updated!'
-                    : 'Your new menu item is ready!');
-
-                cancelEdit();
-                loadMenu();
-
-            } catch (error) {
-
-                alert(error.message);
-
-            }
-
-        });
-
-        // INITIAL LOAD
-
-        loadMenu();
-
-    </script>
-
+// ---- start the page ----
+var currentUser = startPage('menu.html');
+if (currentUser) {
+    role = currentUser.role;
+    if (role === 'Member') {
+        document.getElementById('formCard').style.display = 'none';
+    }
+    loadItems();
+}
+</script>
 </body>
 </html>
