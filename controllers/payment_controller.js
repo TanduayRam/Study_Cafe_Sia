@@ -1,102 +1,54 @@
 const Payment = require('../models/payment_model');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-// Get all payments
-exports.getAll = async (req, res) => {
+// GET /payments
+exports.getAll = async function (req, res, next) {
     try {
         const payments = await Payment.getAll();
-
-        return res.status(200).json({
-            success: true,
-            data: payments
-        });
+        return sendSuccess(res, payments, 'Payments retrieved.');
     } catch (error) {
-        console.error('Get payments error:', error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve payments.'
-        });
+        next(error);
     }
 };
 
-// Get one payment
-exports.getById = async (req, res) => {
+// GET /payments/:id
+exports.getById = async function (req, res, next) {
     try {
-        const id = Number(req.params.id);
+        const payment = await Payment.getById(toId(req.params.id, 'Payment ID'));
 
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid payment ID.'
-            });
+        if (!payment) {
+            throw createError(404, 'Payment not found.');
+        }
+
+        return sendSuccess(res, payment, 'Payment retrieved.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// PUT /payments/:id/void   with { "reason": "..." }
+exports.voidPayment = async function (req, res, next) {
+    try {
+        const id = toId(req.params.id, 'Payment ID');
+        const reason = (req.body || {}).reason;
+
+        if (isBlank(reason)) {
+            throw createError(400, 'A reason is required to void a payment.');
         }
 
         const payment = await Payment.getById(id);
-
         if (!payment) {
-            return res.status(404).json({
-                success: false,
-                message: 'Payment not found.'
-            });
+            throw createError(404, 'Payment not found.');
         }
 
-        return res.status(200).json({
-            success: true,
-            data: payment
-        });
+        const worked = await Payment.voidPayment(id, String(reason).trim(), req.user.user_id);
+        if (!worked) {
+            throw createError(400, 'This payment is already voided.');
+        }
+
+        const updated = await Payment.getById(id);
+        return sendSuccess(res, updated, 'Payment voided.');
     } catch (error) {
-        console.error('Get payment error:', error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve payment.'
-        });
-    }
-};
-
-// Void a payment
-exports.voidPayment = async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        const { reason } = req.body || {};
-
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid payment ID.'
-            });
-        }
-
-        if (
-            typeof reason !== 'string' ||
-            !reason.trim()
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'A valid void reason is required.'
-            });
-        }
-
-        const success = await Payment.voidPayment(id, reason.trim());
-
-        if (!success) {
-            return res.status(404).json({
-                success: false,
-                message: 'Payment not found or already voided.'
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'Payment voided successfully.'
-        });
-
-    } catch (error) {
-        console.error('Void payment error:', error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to void payment.'
-        });
+        next(error);
     }
 };
