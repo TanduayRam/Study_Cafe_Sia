@@ -1,9 +1,7 @@
+const router = require('express').Router();
+const engine = require('../controllers/engine_controller');
+const { authenticateToken, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const express = require('express');
-const router = express.Router();
-
-const engineController = require('../controllers/engine_controller');
-
-router.post('/check', engineController.check);
+router.post('/check', authenticateToken, isAdminOrStaff, engine.check);
 
 module.exports = router;
