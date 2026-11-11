@@ -1,116 +1,153 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Payments</title>
-</head>
-<body>
-    <h2>Payment Records</h2>
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Study Cafe - Payments & Billing</title>
+ <link rel="stylesheet" href="app.css">
+ </head>
+ <body>
+ git<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Payments & Billing</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2>Billing tools</h2>
+    <div class="row">
+        <div><label>Compute a bill (reservation ID)</label><input type="number" id="billReservationId" min="1"></div>
+        <div><label>Pretend check-out time (optional)</label><input type="datetime-local" id="billTime"></div>
+        <div><button class="btn" onclick="computeBill()">Compute bill</button></div>
+    </div>
+    <pre class="bill" id="billOutput" style="display:none"></pre>
 
-    <p id="status">Loading payment records...</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
 
-    <table border="1">
-        <thead>
-            <tr>
-                <th>Payment ID</th>
-                <th>Reservation ID</th>
-                <th>Pass Amount</th>
-                <th>Cash Amount</th>
-                <th>Total Amount</th>
-                <th>Payment Method</th>
-                <th>Status</th>
-                <th>Paid At</th>
-                <th>Void Reason</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="paymentList"></tbody>
-    </table>
+    <div class="row">
+        <div><label>Release no-shows - pretend "now" (optional, for the demo)</label><input type="datetime-local" id="noShowTime"></div>
+        <div><button class="btn primary" onclick="releaseNoShows()">Release no-shows</button></div>
+    </div>
+    <p class="hint">A Confirmed reservation not checked in 15 minutes after its start becomes NoShow and its seat is released.</p>
+</div>
 
-    <script>
-        async function loadPayments() {
-            const status = document.getElementById('status');
-            const list = document.getElementById('paymentList');
+<div class="card">
+    <h2>Payments</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Reservation</th><th>Member</th><th>Pass hours</th><th>Pass part</th><th>Cash part</th><th>Total</th><th>Method</th><th>Status</th><th>Paid at</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
 
-            status.textContent = 'Loading payment records...';
+<script src="api.js"></script>
+<script>
+var isAdmin = false;
 
-            try {
-                const res = await fetch('/api/payments');
+async function loadPayments() {
+    try {
+        showLoading();
+        var result = await callApi('/payments');
 
-                if (!res.ok) {
-                    throw new Error('Failed to retrieve payment records.');
-                }
+        var html = '';
+        for (var i = 0; i < result.data.length; i++) {
+            var p = result.data[i];
 
-                const response = await res.json();
-                const payments = response.data;
-
-                list.innerHTML = payments.map(payment => `
-                    <tr>
-                        <td>${payment.payment_id}</td>
-                        <td>${payment.reservation_id}</td>
-                        <td>₱${Number(payment.pass_amount).toFixed(2)}</td>
-                        <td>₱${Number(payment.cash_amount).toFixed(2)}</td>
-                        <td>₱${Number(payment.total_amount).toFixed(2)}</td>
-                        <td>${payment.payment_method}</td>
-                        <td>${payment.status}</td>
-                        <td>${payment.paid_at || ''}</td>
-                        <td>${payment.void_reason || ''}</td>
-                        <td>
-                            ${payment.status === 'Paid'
-                                ? `<button onclick="voidPayment(${payment.payment_id})">Void</button>`
-                                : 'No action'}
-                        </td>
-                    </tr>
-                `).join('');
-
-                status.textContent = 'Payment records loaded successfully!';
-
-            } catch (error) {
-                status.textContent = error.message;
+            var statusText = badge(p.status);
+            if (p.void_reason) {
+                statusText = statusText + '<div class="hint">' + escapeHtml(p.void_reason) + '</div>';
             }
+
+            var button = '';
+            if (isAdmin && p.status === 'Paid') {
+                button = '<button class="btn small danger" onclick="voidPayment(' + p.payment_id + ')">Void</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + p.payment_id + '</td>' +
+                '<td>' + p.reservation_id + '</td>' +
+                '<td>' + escapeHtml(p.member_name) + '</td>' +
+                '<td>' + formatNumber(p.pass_hours_used) + '</td>' +
+                '<td>' + formatMoney(p.pass_amount) + '</td>' +
+                '<td>' + formatMoney(p.cash_amount) + '</td>' +
+                '<td>' + formatMoney(p.total_amount) + '</td>' +
+                '<td>' + escapeHtml(p.payment_method) + '</td>' +
+                '<td>' + statusText + '</td>' +
+                '<td>' + formatDate(p.paid_at) + '</td>' +
+                '<td class="actions">' + button + '</td></tr>';
+        }
+        if (result.data.length === 0) {
+            html = '<tr><td colspan="11" class="empty">No payments yet.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// Shows the bill of any reservation (nothing is saved).
+async function computeBill() {
+    try {
+        var path = '/billing/compute/' + document.getElementById('billReservationId').value;
+        var time = document.getElementById('billTime').value;
+        if (time) {
+            path = path + '?checkout_time=' + encodeURIComponent(inputToIso(time));
         }
 
-        async function voidPayment(id) {
-            const reason = prompt('Enter the reason for voiding this payment:');
+        var result = await callApi(path);
+        var output = document.getElementById('billOutput');
+        output.textContent = billText(result.data);
+        output.style.display = 'block';
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
 
-            if (reason === null) {
-                return;
-            }
-
-            if (!reason.trim()) {
-                alert('A void reason is required.');
-                return;
-            }
-
-            if (!confirm('Are you sure you want to void this payment?')) {
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/payments/' + id + '/void', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        reason: reason.trim()
-                    })
-                });
-
-                const response = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(response.message || 'Failed to void payment.');
-                }
-
-                alert('Payment voided successfully!');
-                loadPayments();
-
-            } catch (error) {
-                alert(error.message);
-            }
+// POST /billing/release-no-shows
+async function releaseNoShows() {
+    try {
+        var body = {};
+        var time = document.getElementById('noShowTime').value;
+        if (time) {
+            body.now = inputToIso(time);
         }
 
+        var result = await callApi('/billing/release-no-shows', 'POST', body);
+        showMessage(result.message, false);
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// PUT /payments/:id/void   (Admin only)
+async function voidPayment(id) {
+    var reason = prompt('Reason for voiding this payment:');
+    if (!reason) {
+        return;
+    }
+    try {
+        var result = await callApi('/payments/' + id + '/void', 'PUT', { reason: reason });
+        showMessage(result.message, false);
         loadPayments();
-    </script>
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('payments.html');
+if (currentUser) {
+    isAdmin = (currentUser.role === 'Admin');
+    loadPayments();
+}
+</script>
 </body>
 </html>

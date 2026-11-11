@@ -48,6 +48,19 @@ const RESERVATION_SIDE =
     'FROM reservations r INNER JOIN users u ON r.user_id = u.user_id ' +
     'GROUP BY u.user_id, u.name';
 
+const getMenuItemOrders = async () => {
+    const sql = `
+        SELECT
+            m.menu_item_id,
+            m.name,
+            COUNT(oi.order_item_id) AS order_count
+        FROM menu_items m
+        LEFT JOIN order_items oi
+            ON m.menu_item_id = oi.menu_item_id
+        GROUP BY m.menu_item_id, m.name
+        ORDER BY m.name ASC
+    `;
+
 // The columns we show. p = pass side, r = reservation side.
 // COALESCE picks the first value that is not NULL.
 const ACTIVITY_COLUMNS =
@@ -98,3 +111,5 @@ module.exports = {
     getMemberActivity: getMemberActivity,
     getMenuItemOrders: getMenuItemOrders
 };
+    getMenuItemOrders
+ };
