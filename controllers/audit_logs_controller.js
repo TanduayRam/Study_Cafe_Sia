@@ -1,60 +1,42 @@
 const auditLogs = require('../models/audit_logs_model');
+const { createError, sendSuccess, toId } = require('../utils/http');
 
-exports.getAll = async (req, res) => {
+// The audit log is READ-ONLY: there is no create, update or delete here.
+
+// GET /audit-logs   (optional ?table_name=payments&action=PAYMENT&limit=50)
+exports.getAll = async function (req, res, next) {
     try {
-        const data = await auditLogs.getAll();
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+        let limit = 200;
 
-exports.getById = async (req, res) => {
-    try {
-        const data = await auditLogs.findById(req.params.id);
-
-        if (!data) {
-            return res.status(404).json({ message: 'Audit log not found' });
+        if (req.query.limit !== undefined) {
+            limit = Number(req.query.limit);
+            if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+                throw createError(400, 'Limit must be a whole number from 1 to 1000.');
+            }
         }
 
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-exports.create = async (req, res) => {
-    try {
-        const {
-            userId,
-            action,
-            tableName,
-            recordId,
-            description
-        } = req.body;
-
-        const id = await auditLogs.create(
-            userId,
-            action,
-            tableName,
-            recordId,
-            description
-        );
-
-        res.status(201).json({
-            message: 'Audit log created successfully',
-            id
+        const rows = await auditLogs.getAll({
+            table_name: req.query.table_name,
+            action: req.query.action,
+            limit: limit
         });
+        return sendSuccess(res, rows, 'Audit logs retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-exports.remove = async (req, res) => {
+// GET /audit-logs/:id
+exports.getById = async function (req, res, next) {
     try {
-        await auditLogs.remove(req.params.id);
-        res.json({ message: 'Audit log deleted successfully' });
+        const row = await auditLogs.getById(toId(req.params.id, 'Audit log ID'));
+
+        if (!row) {
+            throw createError(404, 'Audit log not found.');
+        }
+
+        return sendSuccess(res, row, 'Audit log retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
