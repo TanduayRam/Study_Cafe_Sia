@@ -1,4 +1,24 @@
 {
+    "name": "group4_Sec_C_STUDYCAFE",
+    "version": "1.0.0",
+    "description": "Study Cafe Reservation, Billing and Monitoring System (SIA final project)",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "node --watch index.js",
+        "setup-db": "node scripts/setup_db.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TanduayRam/Study_Cafe_Sia.git"
+    },
+    "keywords": ["sia", "final", "project", "sy25-26"],
+    "author": "Group 4",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/TanduayRam/Study_Cafe_Sia/issues"
+    },
+    "homepage": "https://github.com/TanduayRam/Study_Cafe_Sia#readme",
     "dependencies": {
         "bcryptjs": "^2.4.3",
         "cors": "^2.8.6",
@@ -6,28 +26,5 @@
         "express": "^5.3.0",
         "jsonwebtoken": "^9.0.3",
         "mysql2": "^3.24.6"
-    },
-    "name": "group_4_study_cafe.sia",
-    "version": "1.0.0",
-    "description": "Final Project",
-    "main": "index.js",
-    "scripts": {
-        "start": "node index.js"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/TanduayRam/Study_Cafe_Sia.git"
-    },
-    "keywords": [
-        "sia",
-        "final",
-        "project",
-        "sy25-26"
-    ],
-    "author": "Group 4",
-    "license": "ISC",
-    "bugs": {
-        "url": "https://github.com/TanduayRam/Study_Cafe_Sia/issues"
-    },
-    "homepage": "https://github.com/TanduayRam/Study_Cafe_Sia#readme"
+    }
 }
