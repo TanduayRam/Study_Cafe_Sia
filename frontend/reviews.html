@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Reviews</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Reviews</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2>Leave a review</h2>
+    <div class="row">
+        <div><label>Completed reservation</label><select id="reservationSelect"></select></div>
+        <div><label>Rating</label>
+            <select id="ratingSelect">
+                <option value="5">5 - &#9733;&#9733;&#9733;&#9733;&#9733;</option>
+                <option value="4">4 - &#9733;&#9733;&#9733;&#9733;&#9734;</option>
+                <option value="3">3 - &#9733;&#9733;&#9733;&#9734;&#9734;</option>
+                <option value="2">2 - &#9733;&#9733;&#9734;&#9734;&#9734;</option>
+                <option value="1">1 - &#9733;&#9734;&#9734;&#9734;&#9734;</option>
+            </select>
+        </div>
+        <div style="flex:2"><label>Comment</label><input id="commentInput" maxlength="500"></div>
+        <div><button class="btn primary" onclick="saveReview()">Submit</button></div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>All reviews</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Member</th><th>Seat</th><th>Rating</th><th>Comment</th><th>Date</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var currentUser = null;
+var reviews = [];
+
+// Turns 4 into "★★★★☆".
+function makeStars(rating) {
+    var text = '';
+    for (var i = 1; i <= 5; i++) {
+        if (i <= rating) {
+            text = text + '\u2605';
+        } else {
+            text = text + '\u2606';
+        }
+    }
+    return text;
+}
+
+async function loadReviews() {
+    try {
+        showLoading();
+        var result = await callApi('/reviews');
+        reviews = result.data;
+
+        // Which reservations already have a review?
+        var reviewedIds = [];
+
+        var html = '';
+        for (var i = 0; i < reviews.length; i++) {
+            var r = reviews[i];
+            reviewedIds.push(r.reservation_id);
+
+            // Only the author or an Admin may change a review.
+            var buttons = '';
+            if (currentUser.role === 'Admin' || r.user_id === currentUser.user_id) {
+                buttons = '<button class="btn small" onclick="editReview(' + r.review_id + ')">Edit</button> ' +
+                          '<button class="btn small danger" onclick="deleteReview(' + r.review_id + ')">Delete</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + r.review_id + '</td>' +
+                '<td>' + escapeHtml(r.member_name) + '</td>' +
+                '<td>' + escapeHtml(r.zone_name) + ' - ' + escapeHtml(r.seat_label) + '</td>' +
+                '<td>' + makeStars(r.rating) + '</td>' +
+                '<td>' + escapeHtml(r.comment) + '</td>' +
+                '<td>' + formatDate(r.created_at) + '</td>' +
+                '<td class="actions">' + buttons + '</td></tr>';
+        }
+        if (reviews.length === 0) {
+            html = '<tr><td colspan="7" class="empty">No reviews yet.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+
+        // Fill the dropdown with Completed reservations that have no review yet.
+        var completed = await callApi('/reservations?status=Completed');
+        var options = '';
+        for (var j = 0; j < completed.data.length; j++) {
+            var c = completed.data[j];
+            if (reviewedIds.indexOf(c.reservation_id) === -1) {
+                options = options + '<option value="' + c.reservation_id + '">#' + c.reservation_id + ' ' +
+                    escapeHtml(c.zone_name) + ' - ' + escapeHtml(c.seat_label) + '</option>';
+            }
+        }
+        if (options === '') {
+            options = '<option value="">No completed reservations to review</option>';
+        }
+        document.getElementById('reservationSelect').innerHTML = options;
+
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+async function saveReview() {
+    try {
+        var body = {
+            reservation_id: document.getElementById('reservationSelect').value,
+            rating: document.getElementById('ratingSelect').value,
+            comment: document.getElementById('commentInput').value
+        };
+        var result = await callApi('/reviews', 'POST', body);
+        document.getElementById('commentInput').value = '';
+        showMessage(result.message, false);
+        loadReviews();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function editReview(id) {
+    var r = findById(reviews, 'review_id', id);
+
+    var rating = prompt('New rating (1-5):', r.rating);
+    if (!rating) {
+        return;
+    }
+    var comment = prompt('Comment:', r.comment || '');
+
+    try {
+        var result = await callApi('/reviews/' + id, 'PUT', { rating: rating, comment: comment });
+        showMessage(result.message, false);
+        loadReviews();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function deleteReview(id) {
+    if (confirm('Delete this review?') === false) {
+        return;
+    }
+    try {
+        var result = await callApi('/reviews/' + id, 'DELETE');
+        showMessage(result.message, false);
+        loadReviews();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+currentUser = startPage('reviews.html');
+if (currentUser) {
+    loadReviews();
+}
+</script>
+</body>
+</html>
