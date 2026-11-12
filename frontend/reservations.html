@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Reservations</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Reservations</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2 id="formTitle">New reservation</h2>
+    <div class="row">
+        <div id="memberBox"><label>Member</label><select id="memberSelect"></select></div>
+        <div><label>Seat</label><select id="seatSelect"></select></div>
+        <div><label>Start</label><input type="datetime-local" id="startInput"></div>
+        <div><label>End</label><input type="datetime-local" id="endInput"></div>
+        <div>
+            <button class="btn primary" id="saveButton" onclick="saveReservation()">Reserve</button>
+            <button class="btn" onclick="clearForm()">Clear</button>
+        </div>
+    </div>
+    <p class="hint">Minimum 1 hour. The maximum is the zone limit (Game Station 2 hours). A seat cannot overlap another booking.</p>
+</div>
+
+<div class="card">
+    <div class="toolbar">
+        <h2>Reservations</h2>
+        <select id="statusFilter" onchange="loadReservations()" style="width:auto">
+            <option value="">All statuses</option>
+            <option>Confirmed</option><option>CheckedIn</option><option>Completed</option>
+            <option>Cancelled</option><option>NoShow</option>
+        </select>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Member</th><th>Zone / seat</th><th>Start</th><th>End</th><th>Status</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="checkoutBox" style="display:none">
+    <h2>Check out reservation #<span id="checkoutId"></span></h2>
+    <pre class="bill" id="billText">Calculating...</pre>
+    <div class="row">
+        <div><label>Payment method for the cash part</label>
+            <select id="methodSelect"><option>Cash</option><option>GCash</option><option>Card</option></select>
+        </div>
+        <div><label>Demo only: pretend check-out time (empty = now)</label>
+            <input type="datetime-local" id="checkoutTime">
+        </div>
+    </div>
+    <div style="margin-top:12px">
+        <button class="btn" onclick="showBill()">Recalculate</button>
+        <button class="btn" onclick="closeCheckout()">Close</button>
+        <button class="btn primary" onclick="confirmCheckout()">Confirm check-out</button>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var currentUser = null;
+var isStaff = false;
+var reservations = [];
+var editingId = null;
+var checkoutReservationId = null;
+
+// Puts "next full hour" and "one hour later" in the Start and End boxes.
+function setDefaultTimes() {
+    var start = new Date();
+    start.setMinutes(0, 0, 0);
+    start.setHours(start.getHours() + 1);
+    var end = new Date(start.getTime() + 3600000);
+
+    document.getElementById('startInput').value = dateToInput(start);
+    document.getElementById('endInput').value = dateToInput(end);
+}
+
+function clearForm() {
+    editingId = null;
+    document.getElementById('formTitle').textContent = 'New reservation';
+    document.getElementById('saveButton').textContent = 'Reserve';
+    setDefaultTimes();
+}
+
+// Fill the Seat dropdown (and the Member dropdown for staff).
+async function loadChoices() {
+    var seats = await callApi('/seats');
+    var html = '';
+    for (var i = 0; i < seats.data.length; i++) {
+        var s = seats.data[i];
+        if (s.status !== 'Maintenance') {
+            html = html + '<option value="' + s.seat_id + '">' + escapeHtml(s.zone_name) + ' - ' +
+                escapeHtml(s.label) + ' (' + formatMoney(s.hourly_rate) + '/h)</option>';
+        }
+    }
+    document.getElementById('seatSelect').innerHTML = html;
+
+    if (isStaff) {
+        var members = await callApi('/users/members');
+        html = '';
+        for (var j = 0; j < members.data.length; j++) {
+            html = html + '<option value="' + members.data[j].user_id + '">' + escapeHtml(members.data[j].name) + '</option>';
+        }
+        document.getElementById('memberSelect').innerHTML = html;
+    }
+}
+
+// Decides which buttons a row gets, depending on its status and who is logged in.
+function buttonsFor(r) {
+    var id = r.reservation_id;
+    var html = '';
+
+    if (r.status === 'Confirmed') {
+        if (isStaff) {
+            html = html + '<button class="btn small" onclick="checkInReservation(' + id + ')">Check in</button> ';
+        }
+        html = html + '<button class="btn small" onclick="startEdit(' + id + ')">Edit</button> ';
+        html = html + '<button class="btn small danger" onclick="cancelReservation(' + id + ')">Cancel</button>';
+    } else if (r.status === 'CheckedIn') {
+        if (isStaff) {
+            html = html + '<button class="btn small primary" onclick="openCheckout(' + id + ')">Check out</button> ';
+        }
+        if (currentUser.role === 'Admin') {
+            html = html + '<button class="btn small danger" onclick="cancelReservation(' + id + ')">Cancel</button>';
+        }
+    }
+    return html;
+}
+
+async function loadReservations() {
+    try {
+        showLoading();
+
+        var path = '/reservations';
+        var status = document.getElementById('statusFilter').value;
+        if (status) {
+            path = path + '?status=' + status;
+        }
+
+        var result = await callApi(path);
+        reservations = result.data;
+
+        var html = '';
+        for (var i = 0; i < reservations.length; i++) {
+            var r = reservations[i];
+            html = html + '<tr>' +
+                '<td>' + r.reservation_id + '</td>' +
+                '<td>' + escapeHtml(r.member_name) + '</td>' +
+                '<td>' + escapeHtml(r.zone_name) + ' - ' + escapeHtml(r.seat_label) + '</td>' +
+                '<td>' + formatDate(r.start_time) + '</td>' +
+                '<td>' + formatDate(r.end_time) + '</td>' +
+                '<td>' + badge(r.status) + '</td>' +
+                '<td class="actions">' + buttonsFor(r) + '</td></tr>';
+        }
+        if (reservations.length === 0) {
+            html = '<tr><td colspan="7" class="empty">No reservations found.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// Save = POST (new) or PUT (when editing).
+async function saveReservation() {
+    try {
+        var body = {
+            seat_id: document.getElementById('seatSelect').value,
+            start_time: inputToIso(document.getElementById('startInput').value),
+            end_time: inputToIso(document.getElementById('endInput').value)
+        };
+        if (isStaff) {
+            body.user_id = document.getElementById('memberSelect').value;
+        }
+
+        var result;
+        if (editingId === null) {
+            result = await callApi('/reservations', 'POST', body);
+        } else {
+            result = await callApi('/reservations/' + editingId, 'PUT', body);
+        }
+
+        showMessage(result.message, false);
+        clearForm();
+        loadReservations();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// Put a reservation in the form so it can be changed.
+function startEdit(id) {
+    var r = findById(reservations, 'reservation_id', id);
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit reservation #' + id;
+    document.getElementById('saveButton').textContent = 'Save changes';
+    document.getElementById('seatSelect').value = r.seat_id;
+    document.getElementById('startInput').value = dateToInput(new Date(r.start_time));
+    document.getElementById('endInput').value = dateToInput(new Date(r.end_time));
+    window.scrollTo(0, 0);
+}
+
+async function checkInReservation(id) {
+    try {
+        var result = await callApi('/reservations/' + id + '/check-in', 'POST');
+        showMessage(result.message, false);
+        loadReservations();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function cancelReservation(id) {
+    if (confirm('Cancel this reservation?') === false) {
+        return;
+    }
+    try {
+        var result = await callApi('/reservations/' + id, 'DELETE');
+        showMessage(result.message, false);
+        loadReservations();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- Check-out box ----
+
+async function openCheckout(id) {
+    checkoutReservationId = id;
+    document.getElementById('checkoutId').textContent = id;
+    document.getElementById('checkoutTime').value = '';
+    document.getElementById('billText').textContent = 'Calculating...';
+    document.getElementById('checkoutBox').style.display = 'block';
+    document.getElementById('checkoutBox').scrollIntoView();
+    await showBill();
+}
+
+function closeCheckout() {
+    document.getElementById('checkoutBox').style.display = 'none';
+}
+
+// Asks the API for the bill (nothing is saved yet).
+async function showBill() {
+    try {
+        var path = '/billing/compute/' + checkoutReservationId;
+        var time = document.getElementById('checkoutTime').value;
+        if (time) {
+            path = path + '?checkout_time=' + encodeURIComponent(inputToIso(time));
+        }
+        var result = await callApi(path);
+        document.getElementById('billText').textContent = billText(result.data);
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// Really checks out: saves the payment, frees the seat.
+async function confirmCheckout() {
+    try {
+        var body = { payment_method: document.getElementById('methodSelect').value };
+        var time = document.getElementById('checkoutTime').value;
+        if (time) {
+            body.checkout_time = inputToIso(time);
+        }
+
+        var result = await callApi('/reservations/' + checkoutReservationId + '/check-out', 'POST', body);
+        closeCheckout();
+        showMessage(result.message + ' Total ' + formatMoney(result.data.bill.total_amount), false);
+        loadReservations();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+currentUser = startPage('reservations.html');
+if (currentUser) {
+    isStaff = (currentUser.role !== 'Member');
+    if (isStaff === false) {
+        document.getElementById('memberBox').style.display = 'none';   // a Member books for themselves
+    }
+    setDefaultTimes();
+    loadChoices().catch(function (error) {
+        showMessage(error.message, true);
+    });
+    loadReservations();
+}
+</script>
+</body>
+</html>

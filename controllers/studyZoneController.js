@@ -1,69 +1,112 @@
-const studyZoneModel = require('../models/studyZoneModel');
+const zoneModel = require('../models/studyZoneModel');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-const getAll = async (req, res) => {
+const ZONE_TYPES = ['Open Floor', 'Quiet Zone', 'Private Room', 'Game Station', 'Solitude Wall'];
+
+// Checks the form data and returns clean values. Throws a 400 error if something is wrong.
+function validateZone(body) {
+    if (isBlank(body.name)) {
+        throw createError(400, 'Zone name is required.');
+    }
+    if (ZONE_TYPES.includes(body.type) === false) {
+        throw createError(400, 'Zone type must be one of: ' + ZONE_TYPES.join(', ') + '.');
+    }
+
+    const rate = Number(body.hourly_rate);
+    if (isBlank(body.hourly_rate) || isNaN(rate) || rate <= 0) {
+        throw createError(400, 'Hourly rate must be a number above 0.');
+    }
+
+    const hours = Number(body.max_hours);
+    if (isBlank(body.max_hours) || !Number.isInteger(hours) || hours < 1 || hours > 8) {
+        throw createError(400, 'Max hours must be a whole number from 1 to 8.');
+    }
+
+    const capacity = Number(body.capacity);
+    if (isBlank(body.capacity) || !Number.isInteger(capacity) || capacity < 1) {
+        throw createError(400, 'Capacity must be a whole number of at least 1.');
+    }
+
+    return {
+        name: String(body.name).trim(),
+        type: body.type,
+        hourly_rate: rate,
+        max_hours: hours,
+        capacity: capacity
+    };
+}
+
+// GET /study-zones
+exports.getAll = async function (req, res, next) {
     try {
-        const zones = await studyZoneModel.getAll();
-        res.status(200).json(zones);
+        const zones = await zoneModel.getAll();
+        return sendSuccess(res, zones, 'Study zones retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const getById = async (req, res) => {
+// GET /study-zones/:id
+exports.getById = async function (req, res, next) {
     try {
-        const zone = await studyZoneModel.getById(req.params.id);
+        const zone = await zoneModel.getById(toId(req.params.id, 'Zone ID'));
 
         if (!zone) {
-            return res.status(404).json({ message: 'Study zone not found' });
+            throw createError(404, 'Study zone not found.');
         }
 
-        res.status(200).json(zone);
+        return sendSuccess(res, zone, 'Study zone retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const create = async (req, res) => {
+// POST /study-zones
+exports.create = async function (req, res, next) {
     try {
-        const zone = await studyZoneModel.create(req.body);
-        res.status(201).json(zone);
+        const clean = validateZone(req.body || {});
+        const zone = await zoneModel.create(clean);
+        return sendSuccess(res, zone, 'Study zone created.', 201);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const update = async (req, res) => {
+// PUT /study-zones/:id
+exports.update = async function (req, res, next) {
     try {
-        const existing = await studyZoneModel.getById(req.params.id);
+        const id = toId(req.params.id, 'Zone ID');
+        const clean = validateZone(req.body || {});
+        const zone = await zoneModel.update(id, clean);
 
-        if (!existing) {
-            return res.status(404).json({ message: 'Study zone not found' });
+        if (!zone) {
+            throw createError(404, 'Study zone not found.');
         }
 
-        const result = await studyZoneModel.update(req.params.id, req.body);
-        res.status(200).json({ message: 'Study zone updated successfully' });
+        return sendSuccess(res, zone, 'Study zone updated.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
-const remove = async (req, res) => {
-    try {
-        const result = await studyZoneModel.remove(req.params.id);
 
-        if (!result) {
-            return res.status(404).json({ message: 'Study zone not found' });
+// DELETE /study-zones/:id
+exports.remove = async function (req, res, next) {
+    try {
+        const id = toId(req.params.id, 'Zone ID');
+
+        const zone = await zoneModel.getById(id);
+        if (!zone) {
+            throw createError(404, 'Study zone not found.');
         }
 
-        res.status(200).json({ message: 'Study zone deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+        const seatCount = await zoneModel.countSeats(id);
+        if (seatCount > 0) {
+            throw createError(400, 'This zone still has seats. Remove or move its seats first.');
+        }
 
-module.exports = {
-    getAll,
-    getById,
-    create,
-    update,
-    remove
+        await zoneModel.remove(id);
+        return sendSuccess(res, { zone_id: id }, 'Study zone deleted.');
+    } catch (error) {
+        next(error);
+    }
 };

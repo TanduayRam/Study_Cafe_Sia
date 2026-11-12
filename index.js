@@ -1,84 +1,117 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const app = express();
 const db = require('./config/databases');
+const { sendSuccess } = require('./utils/http');
+const { notFound, errorHandler } = require('./middleware/error_handler');
 
-app.use(cors());
-app.use(express.json());
+const app = express();
 
-// Serve frontend files from this project's frontend folder
+app.use(cors());           // allows the browser to call our API
+app.use(express.json());   // lets us read JSON sent in the request body
+
+// The frontend (HTML, CSS, JS files) is served from the "frontend" folder.
 app.use(express.static(path.join(__dirname, 'frontend')));
-
-// Home page
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'login.html'));
+app.get('/', function (req, res) {
+    res.redirect('/login.html');
 });
 
-// Database connection test
-app.get('/api/test-db', async (req, res) => {
+// ----------------------------------------------------------------
+// REST API: every address starts with /api/v1
+// Add one line here for every new route file.
+// ----------------------------------------------------------------
+const api = express.Router();
+
+// A quick test that the server and the database are working.
+api.get('/health', async function (req, res, next) {
     try {
         const [rows] = await db.query('SELECT DATABASE() AS database_name');
-
-        res.json({
-            success: true,
-            message: 'Database connection successful!',
-            database: rows[0].database_name
-        });
+        sendSuccess(res, { database: rows[0].database_name }, 'Server and database are running.');
     } catch (error) {
-        console.error('Database connection error:', error.message);
-
-        res.status(500).json({
-            success: false,
-            message: 'Database connection failed.',
-            error: error.message
-        });
+        next(error);
     }
 });
 
-// Authentication and Membership Routes
-app.use('/api/auth', require('./routes/auth_routes'));
-app.use('/api/users', require('./routes/user_routes'));
-app.use('/api/session-logs', require('./routes/session_logs_routes'));
-app.use('/api/alerts', require('./routes/alerts_routes'));
-app.use('/api/engine', require('./routes/engine_routes'));
-app.use('/api/audit-logs', require('./routes/audit_logs_routes'));
-app.use('/api/no-show', require('./routes/no_show_routes'));
+// Core
+api.use('/auth', require('./routes/auth_routes'));
+api.use('/users', require('./routes/user_routes'));
+api.use('/roles', require('./routes/role_routes'));
 
-// Dashboard, Reports and Feedback
-app.use('/api/v1/dashboard', require('./routes/dashboard_routes'));
-app.use('/api/v1/reports', require('./routes/report_routes'));
-app.use('/api/v1/feedback-reviews', require('./routes/feedback_review_routes'));
-app.use('/api/v1/report-snapshots', require('./routes/report_snapshot_routes'));
+// Master data
+api.use('/study-zones', require('./routes/studyZoneRoutes'));
+api.use('/seats', require('./routes/seatRoutes'));
+api.use('/menu-items', require('./routes/menuItemRoutes'));
 
-// Membership and Payments
-app.use('/api/pass-packages', require('./routes/pass_package_routes'));
-app.use('/api/member-passes', require('./routes/member_pass_routes'));
-app.use('/api/payments', require('./routes/payment_routes'));
-app.use('/api/billing', require('./routes/billing_routes'));
-app.use('/api/billing', require('./routes/no_show_routes'));
-app.use('/api/reports', require('./routes/member_pass_report_routes'));
-app.use('/api/reports', require('./routes/reservation_order_report_routes'));
-app.use('/api/checkout', require('./routes/checkout_routes'));
+// Transactions
+api.use('/reservations', require('./routes/reservationRoutes'));
+api.use('/orders', require('./routes/orderRoutes'));
+api.use('/order-items', require('./routes/orderItemRoutes'));
 
-// Study Café Routes
-app.use('/api/study-zones', require('./routes/studyZoneRoutes'));
-app.use('/api/seats', require('./routes/seatRoutes'));
-app.use('/api/menu-items', require('./routes/menuItemRoutes'));
-app.use('/api/reservations', require('./routes/reservationRoutes'));
-app.use('/api/orders', require('./routes/orderRoutes'));
+// Rules: passes, payments, billing
+api.use('/pass-packages', require('./routes/pass_package_routes'));
+api.use('/member-passes', require('./routes/member_pass_routes'));
+api.use('/payments', require('./routes/payment_routes'));
+api.use('/billing', require('./routes/billing_routes'));
 
-// Test route
-app.get('/test', (req, res) => {
-    res.send('Express is working!');
-});
+// Workflow: sessions, alerts, audit log, engine
+api.use('/session-logs', require('./routes/session_logs_routes'));
+api.use('/alerts', require('./routes/alerts_routes'));
+api.use('/audit-logs', require('./routes/audit_logs_routes'));
+api.use('/engine', require('./routes/engine_routes'));
 
-// Start server only once
-const PORT = 3000;
+// Reviews, snapshots, dashboard and the six join reports
+api.use('/reviews', require('./routes/feedback_review_routes'));
+api.use('/report-snapshots', require('./routes/report_snapshot_routes'));
+api.use('/dashboard', require('./routes/dashboard_routes'));
+api.use('/reports', require('./routes/report_routes'));
 
-app.listen(PORT, () => {
-    console.log(`Study Café server running at http://localhost:${PORT}`);
-});
+app.use('/api/v1', api);
+
+// An /api address that does not exist -> 404. Then every error goes to errorHandler.
+app.use('/api', notFound);
+app.use(errorHandler);
+
+// ----------------------------------------------------------------
+// Optional automatic engine. Turn it on with ENGINE_AUTO=true in .env.
+// Every few seconds it releases no-shows and runs the alert checks.
+// ----------------------------------------------------------------
+function startEngineTimer() {
+    if (String(process.env.ENGINE_AUTO).toLowerCase() !== 'true') {
+        return;
+    }
+
+    const seconds = Number(process.env.ENGINE_INTERVAL_SECONDS || 60);
+    const noShows = require('./models/no_show_model');
+    const engine = require('./models/engine_model');
+
+    setInterval(async function () {
+        try {
+            const released = await noShows.releaseNoShows(new Date());
+            const checks = await engine.checkSessions(new Date());
+
+            if (released.length > 0 || checks.created_alert_ids.length > 0) {
+                console.log('Engine: released ' + released.length + ' no-show(s), created ' +
+                    checks.created_alert_ids.length + ' alert(s).');
+            }
+        } catch (error) {
+            console.error('Engine timer error:', error.message);
+        }
+    }, seconds * 1000);
+
+    console.log('Automatic engine is ON (every ' + seconds + ' seconds).');
+}
+
+const PORT = Number(process.env.PORT || 3000);
+
+// Only start the server when this file is run directly (npm start).
+if (require.main === module) {
+    app.listen(PORT, function () {
+        console.log('Study Cafe server running at http://localhost:' + PORT);
+        startEngineTimer();
+    });
+}
+
+module.exports = app;
