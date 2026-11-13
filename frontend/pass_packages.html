@@ -1,158 +1,518 @@
- <!DOCTYPE html>
- <html lang="en">
- <head>
- <meta charset="utf-8">
- <meta name="viewport" content="width=device-width, initial-scale=1">
- <title>Study Cafe - Pass Packages</title>
- <link rel="stylesheet" href="app.css">
- </head>
- <body>
- <div class="shell">
-    <div class="sidebar" id="menu"></div>
-    <div class="main">
-        <div class="topbar">
-            <h1>Pass Packages</h1>
-            <div class="who" id="who"></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Study Cafe - Pass Packages</title>
+    <link rel="stylesheet" href="app.css">
+</head>
+
+<body>
+    <div class="shell">
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="menu"></div>
+
+        <!-- Main Content -->
+        <div class="main">
+
+            <!-- Page Header -->
+            <div class="topbar">
+                <h1>Pass Packages</h1>
+                <div class="who" id="who"></div>
+            </div>
+
+            <!-- Notification Banner -->
+            <div id="banner"></div>
+
+            <!-- Page Content -->
+            <div id="content">
+
+                <!-- Add/Edit Package Form -->
+                <div class="card" id="formCard">
+                    <h2 id="formTitle">Add a pass package</h2>
+
+                    <div class="row">
+                        <div>
+                            <label for="nameInput">Package name</label>
+                            <input
+                                type="text"
+                                id="nameInput"
+                                maxlength="100"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <label for="hoursInput">Hours included</label>
+                            <input
+                                type="number"
+                                id="hoursInput"
+                                min="0.01"
+                                step="any"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <label for="priceInput">Price (pesos)</label>
+                            <input
+                                type="number"
+                                id="priceInput"
+                                min="0.01"
+                                step="0.01"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <label for="daysInput">Valid for (days)</label>
+                            <input
+                                type="number"
+                                id="daysInput"
+                                min="1"
+                                step="1"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <label for="descriptionInput">Description</label>
+                        <textarea
+                            id="descriptionInput"
+                            rows="2"
+                        ></textarea>
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <button
+                            type="button"
+                            class="btn primary"
+                            id="saveButton"
+                            onclick="savePackage()"
+                        >
+                            Save
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn"
+                            onclick="clearForm()"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Package List -->
+                <div class="card">
+                    <h2>Prepaid hour packages</h2>
+
+                    <div class="tablewrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Hours</th>
+                                    <th>Price</th>
+                                    <th>Valid (days)</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="rows">
+                                <tr>
+                                    <td colspan="7" class="empty">Loading packages...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
         </div>
-        <div id="banner"></div>
-        <div id="content">
-<div class="card" id="formCard">
-    <h2 id="formTitle">Add a pass package</h2>
-    <div class="row">
-        <div><label>Package name</label><input id="nameInput"></div>
-        <div><label>Hours included</label><input id="hoursInput" type="number" step="any"></div>
-        <div><label>Price (pesos)</label><input id="priceInput" type="number" step="any"></div>
-        <div><label>Valid for (days)</label><input id="daysInput" type="number"></div>
     </div>
-    <label>Description</label>
-    <textarea id="descriptionInput" rows="2"></textarea>
-    <div style="margin-top:12px">
-        <button class="btn primary" onclick="savePackage()">Save</button>
-        <button class="btn" onclick="clearForm()">Clear</button>
-    </div>
-</div>
 
-<div class="card">
-    <h2>Prepaid hour packages</h2>
-    <div class="tablewrap">
-        <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Hours</th><th>Price</th><th>Valid (days)</th><th>Description</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-        </table>
-    </div>
-</div>
-        </div>
-    </div>
-</div>
+    <script src="api.js"></script>
 
-<script src="api.js"></script>
-<script>
-var packages = [];
-var editingId = null;
-var isAdmin = false;
+    <script>
+        // =========================================
+        // GLOBAL VARIABLES
+        // =========================================
 
-async function loadPackages() {
-    try {
-        showLoading();
-        var result = await callApi('/pass-packages');
-        packages = result.data;
+        var packages = [];
+        var editingId = null;
+        var isAdmin = false;
+        var isSaving = false;
+        var isDeleting = false;
 
-        var html = '';
-        for (var i = 0; i < packages.length; i++) {
-            var p = packages[i];
-            var buttons = '';
-            if (isAdmin) {
-                buttons = '<button class="btn small" onclick="editPackage(' + p.package_id + ')">Edit</button> ' +
-                          '<button class="btn small danger" onclick="deletePackage(' + p.package_id + ')">Delete</button>';
+
+        // =========================================
+        // ROLE CHECK
+        // =========================================
+
+        function hasAdminAccess() {
+            var user = getUser();
+
+            return !!user &&
+                String(user.role || '').toLowerCase() === 'admin';
+        }
+
+
+        // =========================================
+        // LOAD ALL PASS PACKAGES
+        // =========================================
+
+        async function loadPackages() {
+            var rows = document.getElementById('rows');
+
+            try {
+                showLoading();
+
+                rows.innerHTML =
+                    '<tr><td colspan="7" class="empty">Loading packages...</td></tr>';
+
+                var result = await callApi('/pass-packages');
+
+                packages = Array.isArray(result.data)
+                    ? result.data
+                    : [];
+
+                var html = '';
+
+                for (var i = 0; i < packages.length; i++) {
+                    var p = packages[i];
+
+                    var buttons = '';
+
+                    // Only Admin can manage packages.
+                    if (isAdmin) {
+                        buttons =
+                            '<button type="button" class="btn small" onclick="editPackage(' +
+                            Number(p.package_id) +
+                            ')">Edit</button> ' +
+
+                            '<button type="button" class="btn small danger" onclick="deletePackage(' +
+                            Number(p.package_id) +
+                            ')">Delete</button>';
+                    }
+
+                    html +=
+                        '<tr>' +
+                            '<td>' + escapeHtml(p.package_id) + '</td>' +
+                            '<td>' + escapeHtml(p.name) + '</td>' +
+                            '<td>' + formatNumber(p.hours) + '</td>' +
+                            '<td>' + formatMoney(p.price) + '</td>' +
+                            '<td>' + escapeHtml(p.validity_days) + '</td>' +
+                            '<td>' + escapeHtml(p.description || '') + '</td>' +
+                            '<td class="actions">' + buttons + '</td>' +
+                        '</tr>';
+                }
+
+                if (packages.length === 0) {
+                    html =
+                        '<tr>' +
+                            '<td colspan="7" class="empty">' +
+                                'No pass packages found.' +
+                            '</td>' +
+                        '</tr>';
+                }
+
+                rows.innerHTML = html;
+
+                hideBanner();
+
+            } catch (error) {
+                packages = [];
+
+                rows.innerHTML =
+                    '<tr>' +
+                        '<td colspan="7" class="empty">' +
+                            'Unable to load pass packages.' +
+                        '</td>' +
+                    '</tr>';
+
+                showError(error.message);
             }
-            html = html + '<tr>' +
-                '<td>' + p.package_id + '</td>' +
-                '<td>' + escapeHtml(p.name) + '</td>' +
-                '<td>' + formatNumber(p.hours) + '</td>' +
-                '<td>' + formatMoney(p.price) + '</td>' +
-                '<td>' + p.validity_days + '</td>' +
-                '<td>' + escapeHtml(p.description) + '</td>' +
-                '<td class="actions">' + buttons + '</td></tr>';
-        }
-        if (packages.length === 0) {
-            html = '<tr><td colspan="7" class="empty">No pass packages found.</td></tr>';
-        }
-        document.getElementById('rows').innerHTML = html;
-        hideBanner();
-    } catch (error) {
-        showError(error.message);
-    }
-}
-
-function clearForm() {
-    editingId = null;
-    document.getElementById('formTitle').textContent = 'Add a pass package';
-    document.getElementById('nameInput').value = '';
-    document.getElementById('hoursInput').value = '';
-    document.getElementById('priceInput').value = '';
-    document.getElementById('daysInput').value = '';
-    document.getElementById('descriptionInput').value = '';
-}
-
-function editPackage(id) {
-    var p = findById(packages, 'package_id', id);
-    editingId = id;
-    document.getElementById('formTitle').textContent = 'Edit pass package #' + id;
-    document.getElementById('nameInput').value = p.name;
-    document.getElementById('hoursInput').value = p.hours;
-    document.getElementById('priceInput').value = p.price;
-    document.getElementById('daysInput').value = p.validity_days;
-    document.getElementById('descriptionInput').value = p.description || '';
-    window.scrollTo(0, 0);
-}
-
-async function savePackage() {
-    try {
-        var body = {
-            name: document.getElementById('nameInput').value,
-            hours: document.getElementById('hoursInput').value,
-            price: document.getElementById('priceInput').value,
-            validity_days: document.getElementById('daysInput').value,
-            description: document.getElementById('descriptionInput').value
-        };
-
-        var result;
-        if (editingId === null) {
-            result = await callApi('/pass-packages', 'POST', body);
-        } else {
-            result = await callApi('/pass-packages/' + editingId, 'PUT', body);
         }
 
-        showMessage(result.message, false);
-        clearForm();
-        loadPackages();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
 
-async function deletePackage(id) {
-    if (confirm('Delete this pass package?') === false) {
-        return;
-    }
-    try {
-        var result = await callApi('/pass-packages/' + id, 'DELETE');
-        showMessage(result.message, false);
-        loadPackages();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
+        // =========================================
+        // CLEAR FORM
+        // =========================================
 
-// ---- start the page ----
-var currentUser = startPage('pass_packages.html');
-if (currentUser) {
-    isAdmin = (currentUser.role === 'Admin');
-    if (isAdmin === false) {
-        document.getElementById('formCard').style.display = 'none';
-    }
-    loadPackages();
-}
-</script>
+        function clearForm() {
+            editingId = null;
+
+            document.getElementById('formTitle').textContent =
+                'Add a pass package';
+
+            document.getElementById('nameInput').value = '';
+            document.getElementById('hoursInput').value = '';
+            document.getElementById('priceInput').value = '';
+            document.getElementById('daysInput').value = '';
+            document.getElementById('descriptionInput').value = '';
+
+            document.getElementById('saveButton').textContent = 'Save';
+        }
+
+
+        // =========================================
+        // EDIT PASS PACKAGE
+        // =========================================
+
+        function editPackage(id) {
+            if (!hasAdminAccess()) {
+                showMessage(
+                    'Only Admins can edit pass packages.',
+                    true
+                );
+                return;
+            }
+
+            var p = findById(packages, 'package_id', id);
+
+            if (!p) {
+                showMessage(
+                    'Pass package not found. Please refresh the list.',
+                    true
+                );
+                return;
+            }
+
+            editingId = p.package_id;
+
+            document.getElementById('formTitle').textContent =
+                'Edit pass package #' + id;
+
+            document.getElementById('nameInput').value = p.name || '';
+            document.getElementById('hoursInput').value = p.hours;
+            document.getElementById('priceInput').value = p.price;
+            document.getElementById('daysInput').value = p.validity_days;
+
+            document.getElementById('descriptionInput').value =
+                p.description || '';
+
+            document.getElementById('saveButton').textContent =
+                'Update Package';
+
+            window.scrollTo(0, 0);
+        }
+
+
+        // =========================================
+        // VALIDATE PACKAGE FORM
+        // =========================================
+
+        function validatePackage(body) {
+            if (!body.name) {
+                throw new Error('Package name is required.');
+            }
+
+            if (body.name.length > 100) {
+                throw new Error('Package name cannot exceed 100 characters.');
+            }
+
+            var hours = Number(body.hours);
+            var price = Number(body.price);
+            var days = Number(body.validity_days);
+
+            if (
+                body.hours === '' ||
+                !Number.isFinite(hours) ||
+                hours <= 0
+            ) {
+                throw new Error('Hours must be a number above 0.');
+            }
+
+            if (
+                body.price === '' ||
+                !Number.isFinite(price) ||
+                price <= 0
+            ) {
+                throw new Error('Price must be a number above 0.');
+            }
+
+            if (
+                body.validity_days === '' ||
+                !Number.isInteger(days) ||
+                days <= 0
+            ) {
+                throw new Error('Validity days must be a whole number above 0.');
+            }
+
+            if (!Number.isFinite(price * 100) ||
+                Math.abs(price * 100 - Math.round(price * 100)) > 0.000001) {
+                throw new Error('Price can have at most two decimal places.');
+            }
+
+            body.hours = hours;
+            body.price = price;
+            body.validity_days = days;
+
+            return body;
+        }
+
+
+        // =========================================
+        // SAVE PASS PACKAGE
+        // =========================================
+
+        async function savePackage() {
+            if (!hasAdminAccess()) {
+                showMessage(
+                    'Only Admins can manage pass packages.',
+                    true
+                );
+                return;
+            }
+
+            if (isSaving) {
+                return;
+            }
+
+            try {
+                var body = {
+                    name: document.getElementById('nameInput').value.trim(),
+                    hours: document.getElementById('hoursInput').value,
+                    price: document.getElementById('priceInput').value,
+                    validity_days: document.getElementById('daysInput').value,
+                    description: document.getElementById('descriptionInput').value.trim()
+                };
+
+                body = validatePackage(body);
+
+                isSaving = true;
+
+                var saveButton = document.getElementById('saveButton');
+
+                saveButton.disabled = true;
+                saveButton.textContent = 'Saving...';
+
+                var result;
+
+                if (editingId === null) {
+                    result = await callApi(
+                        '/pass-packages',
+                        'POST',
+                        body
+                    );
+                } else {
+                    result = await callApi(
+                        '/pass-packages/' + editingId,
+                        'PUT',
+                        body
+                    );
+                }
+
+                clearForm();
+
+                await loadPackages();
+
+                showMessage(
+                    result.message || 'Pass package saved successfully.',
+                    false
+                );
+
+            } catch (error) {
+                showMessage(error.message, true);
+
+            } finally {
+                isSaving = false;
+
+                document.getElementById('saveButton').disabled = false;
+
+                if (editingId === null) {
+                    document.getElementById('saveButton').textContent = 'Save';
+                } else {
+                    document.getElementById('saveButton').textContent = 'Update Package';
+                }
+            }
+        }
+
+
+        // =========================================
+        // DELETE PASS PACKAGE
+        // =========================================
+
+        async function deletePackage(id) {
+            if (!hasAdminAccess()) {
+                showMessage(
+                    'Only Admins can delete pass packages.',
+                    true
+                );
+                return;
+            }
+
+            if (isDeleting) {
+                return;
+            }
+
+            var p = findById(packages, 'package_id', id);
+
+            if (!p) {
+                showMessage(
+                    'Pass package not found. Please refresh the list.',
+                    true
+                );
+                return;
+            }
+
+            if (!confirm(
+                'Are you sure you want to delete "' + p.name + '"?'
+            )) {
+                return;
+            }
+
+            try {
+                isDeleting = true;
+
+                var result = await callApi(
+                    '/pass-packages/' + id,
+                    'DELETE'
+                );
+
+                if (String(editingId) === String(id)) {
+                    clearForm();
+                }
+
+                await loadPackages();
+
+                showMessage(
+                    result.message || 'Pass package deleted successfully.',
+                    false
+                );
+
+            } catch (error) {
+                showMessage(error.message, true);
+
+            } finally {
+                isDeleting = false;
+            }
+        }
+
+
+        // =========================================
+        // START PAGE
+        // =========================================
+
+        var currentUser = startPage('pass_packages.html');
+
+        if (currentUser) {
+            isAdmin =
+                String(currentUser.role || '').toLowerCase() === 'admin';
+
+            // Only Admin can see the management form.
+            if (!isAdmin) {
+                document.getElementById('formCard').style.display = 'none';
+            }
+
+            loadPackages();
+        }
+
+    </script>
 </body>
- </html>
+</html>

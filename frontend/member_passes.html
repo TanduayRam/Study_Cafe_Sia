@@ -1,156 +1,497 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Study Cafe - Member Passes</title>
-<link rel="stylesheet" href="app.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Study Cafe - Member Passes</title>
+
+    <link rel="stylesheet" href="app.css">
 </head>
+
 <body>
-<div class="shell">
-    <div class="sidebar" id="menu"></div>
-    <div class="main">
-        <div class="topbar">
-            <h1>Member Passes</h1>
-            <div class="who" id="who"></div>
-        </div>
-        <div id="banner"></div>
-        <div id="content">
-<div class="card" id="assignCard">
-    <h2>Assign a pass</h2>
-    <div class="row">
-        <div><label>Member</label><select id="memberSelect"></select></div>
-        <div><label>Package</label><select id="packageSelect"></select></div>
-        <div><button class="btn primary" onclick="assignPass()">Assign pass</button></div>
+    <div class="shell">
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="menu"></div>
+
+        <!-- Main Content -->
+        <main class="main">
+
+            <!-- Topbar -->
+            <header class="topbar">
+                <div>
+                    <h1>Member Passes</h1>
+                    <p class="page-subtitle">
+                        Manage member pass assignments and remaining hours.
+                    </p>
+                </div>
+
+                <div class="who" id="who"></div>
+            </header>
+
+            <!-- Notification Banner -->
+            <div id="banner" aria-live="polite"></div>
+
+            <div id="content">
+
+                <!-- Assign Pass Card -->
+                <section class="card" id="assignCard">
+
+                    <div class="section-heading">
+                        <div>
+                            <h2>Assign a Pass</h2>
+                            <p class="hint">
+                                Give a member access to a prepaid pass package.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+
+                        <div>
+                            <label for="memberSelect">Member</label>
+
+                            <select id="memberSelect">
+                                <option value="">Select a member</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="packageSelect">Pass Package</label>
+
+                            <select id="packageSelect">
+                                <option value="">Select a package</option>
+                            </select>
+                        </div>
+
+                        <div class="form-action">
+                            <button
+                                type="button"
+                                class="btn primary"
+                                id="assignButton"
+                                onclick="assignPass()"
+                                disabled
+                            >
+                                Assign Pass
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <div class="info-note">
+                        <strong>Pass usage information</strong>
+                        <p>
+                            Passes are used first at check-out, with the
+                            earliest-expiring pass deducted first.
+                            Game Station time is always paid in cash.
+                        </p>
+                    </div>
+
+                </section>
+
+
+                <!-- Member Passes Table -->
+                <section class="card">
+
+                    <div class="section-heading">
+                        <div>
+                            <h2 id="listTitle">All Member Passes</h2>
+                            <p class="hint">
+                                View pass balances, expiration dates, and status.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="tablewrap">
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Member</th>
+                                    <th>Package</th>
+                                    <th>Remaining Hours</th>
+                                    <th>Expires</th>
+                                    <th>State</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="rows">
+                                <tr>
+                                    <td colspan="7" class="empty">
+                                        Loading member passes...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+
+                </section>
+
+            </div>
+        </main>
+
     </div>
-    <p class="hint">Passes are used first at check-out (earliest expiry first). Game Station time is always paid in cash.</p>
-</div>
 
-<div class="card">
-    <h2 id="listTitle">All member passes</h2>
-    <div class="tablewrap">
-        <table>
-            <thead><tr><th>ID</th><th>Member</th><th>Package</th><th>Remaining hours</th><th>Expires</th><th>State</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-        </table>
-    </div>
-</div>
-        </div>
-    </div>
-</div>
 
-<script src="api.js"></script>
-<script>
-var currentUser = null;
-var isStaff = false;
+    <script src="api.js"></script>
 
-// Fill the Member and Package dropdowns (staff only).
-async function loadChoices() {
-    var members = await callApi('/users/members');
-    var html = '';
-    for (var i = 0; i < members.data.length; i++) {
-        html = html + '<option value="' + members.data[i].user_id + '">' + escapeHtml(members.data[i].name) + '</option>';
-    }
-    document.getElementById('memberSelect').innerHTML = html;
+    <script>
+        // =====================================================
+        // GLOBAL VARIABLES
+        // =====================================================
 
-    var packages = await callApi('/pass-packages');
-    html = '';
-    for (var j = 0; j < packages.data.length; j++) {
-        var p = packages.data[j];
-        html = html + '<option value="' + p.package_id + '">' + escapeHtml(p.name) + ' (' + formatNumber(p.hours) + ' h)</option>';
-    }
-    document.getElementById('packageSelect').innerHTML = html;
-}
+        var currentUser = null;
+        var isStaff = false;
+        var isAdmin = false;
 
-async function loadPasses() {
-    try {
-        showLoading();
 
-        // Staff see every pass. A Member sees only their own.
-        var result;
-        if (isStaff) {
-            result = await callApi('/member-passes');
-        } else {
-            result = await callApi('/member-passes/user/' + currentUser.user_id);
+        // =====================================================
+        // LOAD MEMBERS AND PASS PACKAGES
+        // Admin and Staff only
+        // =====================================================
+
+        async function loadChoices() {
+            var memberSelect = document.getElementById('memberSelect');
+            var packageSelect = document.getElementById('packageSelect');
+            var assignButton = document.getElementById('assignButton');
+
+            assignButton.disabled = true;
+
+            try {
+                // Load active members.
+                var members = await callApi('/users/members');
+
+                var memberHtml = '<option value="">Select a member</option>';
+
+                for (var i = 0; i < members.data.length; i++) {
+                    var member = members.data[i];
+
+                    memberHtml +=
+                        '<option value="' + member.user_id + '">' +
+                            escapeHtml(member.name) +
+                        '</option>';
+                }
+
+                memberSelect.innerHTML = memberHtml;
+
+
+                // Load pass packages.
+                var packages = await callApi('/pass-packages');
+
+                var packageHtml = '<option value="">Select a package</option>';
+
+                for (var j = 0; j < packages.data.length; j++) {
+                    var p = packages.data[j];
+
+                    packageHtml +=
+                        '<option value="' + p.package_id + '">' +
+                            escapeHtml(p.name) +
+                            ' (' + formatNumber(p.hours) + ' hours)' +
+                        '</option>';
+                }
+
+                packageSelect.innerHTML = packageHtml;
+
+
+                // Enable assignment only when both lists contain choices.
+                assignButton.disabled =
+                    members.data.length === 0 ||
+                    packages.data.length === 0;
+
+                if (members.data.length === 0) {
+                    showMessage('No active members are available.', true);
+                } else if (packages.data.length === 0) {
+                    showMessage('No pass packages are available.', true);
+                }
+
+            } catch (error) {
+                assignButton.disabled = true;
+                showError(error.message);
+                throw error;
+            }
         }
 
-        var html = '';
-        for (var i = 0; i < result.data.length; i++) {
-            var p = result.data[i];
 
-            var state = '<span class="badge b-green">Active</span>';
-            if (p.is_expired) {
-                state = '<span class="badge b-red">Expired</span>';
-            } else if (p.remaining_hours <= 0) {
-                state = '<span class="badge b-grey">Used up</span>';
+        // =====================================================
+        // LOAD MEMBER PASSES
+        // Admin and Staff: View all passes
+        // Member: View own passes only
+        // =====================================================
+
+        async function loadPasses() {
+            var rows = document.getElementById('rows');
+
+            try {
+                showLoading();
+
+                rows.innerHTML =
+                    '<tr>' +
+                        '<td colspan="7" class="empty">' +
+                            'Loading member passes...' +
+                        '</td>' +
+                    '</tr>';
+
+                var result;
+
+                if (isStaff) {
+                    result = await callApi('/member-passes');
+                } else {
+                    result = await callApi(
+                        '/member-passes/user/' + currentUser.user_id
+                    );
+                }
+
+                var html = '';
+
+                for (var i = 0; i < result.data.length; i++) {
+                    var p = result.data[i];
+
+                    // Determine pass status.
+                    var state = '';
+
+                    if (p.is_expired) {
+                        state =
+                            '<span class="badge b-red">Expired</span>';
+
+                    } else if (Number(p.remaining_hours) <= 0) {
+                        state =
+                            '<span class="badge b-grey">Used Up</span>';
+
+                    } else {
+                        state =
+                            '<span class="badge b-green">Active</span>';
+                    }
+
+
+                    // Admin can remove passes.
+                    var actionButton = '';
+
+                    if (isAdmin) {
+                        actionButton =
+                            '<button ' +
+                                'type="button" ' +
+                                'class="btn small danger" ' +
+                                'onclick="removePass(' + Number(p.member_pass_id) + ')">' +
+                                'Remove' +
+                            '</button>';
+                    }
+
+
+                    // Build table row.
+                    html +=
+                        '<tr>' +
+
+                            '<td>' +
+                                escapeHtml(p.member_pass_id) +
+                            '</td>' +
+
+                            '<td>' +
+                                escapeHtml(p.member_name) +
+                            '</td>' +
+
+                            '<td>' +
+                                escapeHtml(p.package_name) +
+                            '</td>' +
+
+                            '<td>' +
+                                '<strong>' +
+                                    formatNumber(p.remaining_hours) +
+                                '</strong>' +
+                                ' / ' +
+                                formatNumber(p.package_hours) +
+                            '</td>' +
+
+                            '<td>' +
+                                formatDateOnly(p.expires_on) +
+                            '</td>' +
+
+                            '<td>' +
+                                state +
+                            '</td>' +
+
+                            '<td class="actions">' +
+                                actionButton +
+                            '</td>' +
+
+                        '</tr>';
+                }
+
+
+                // Display an empty message if no passes exist.
+                if (result.data.length === 0) {
+                    html =
+                        '<tr>' +
+                            '<td colspan="7" class="empty">' +
+                                'No member passes found.' +
+                            '</td>' +
+                        '</tr>';
+                }
+
+                rows.innerHTML = html;
+
+                hideBanner();
+
+            } catch (error) {
+                rows.innerHTML =
+                    '<tr>' +
+                        '<td colspan="7" class="empty">' +
+                            'Unable to load member passes.' +
+                        '</td>' +
+                    '</tr>';
+
+                showError(error.message);
+            }
+        }
+
+
+        // =====================================================
+        // ASSIGN PASS
+        // Admin and Staff only
+        // =====================================================
+
+        async function assignPass() {
+
+            // Frontend permission check.
+            if (!isStaff) {
+                showMessage(
+                    'You do not have permission to assign member passes.',
+                    true
+                );
+                return;
             }
 
-            var button = '';
-            if (currentUser.role === 'Admin') {
-                button = '<button class="btn small danger" onclick="removePass(' + p.member_pass_id + ')">Remove</button>';
+            var memberId = document.getElementById('memberSelect').value;
+            var packageId = document.getElementById('packageSelect').value;
+            var assignButton = document.getElementById('assignButton');
+
+            try {
+                // Validate selections.
+                if (!memberId || !packageId) {
+                    showMessage(
+                        'Please select a member and a pass package.',
+                        true
+                    );
+                    return;
+                }
+
+                assignButton.disabled = true;
+                assignButton.textContent = 'Assigning...';
+
+                var body = {
+                    user_id: memberId,
+                    package_id: packageId
+                };
+
+                var result = await callApi(
+                    '/member-passes',
+                    'POST',
+                    body
+                );
+
+                // Refresh the table before displaying success.
+                await loadPasses();
+
+                showMessage(
+                    result.message || 'Pass assigned successfully.',
+                    false
+                );
+
+                // Reset selections after successful assignment.
+                document.getElementById('memberSelect').value = '';
+                document.getElementById('packageSelect').value = '';
+
+            } catch (error) {
+                showMessage(error.message, true);
+
+            } finally {
+                assignButton.textContent = 'Assign Pass';
+
+                // Re-enable only if both choices are available.
+                assignButton.disabled =
+                    !isStaff ||
+                    document.getElementById('memberSelect').options.length <= 1 ||
+                    document.getElementById('packageSelect').options.length <= 1;
+            }
+        }
+
+
+        // =====================================================
+        // REMOVE PASS
+        // Admin only
+        // =====================================================
+
+        async function removePass(id) {
+
+            // Frontend permission check.
+            if (!isAdmin) {
+                showMessage(
+                    'You do not have permission to remove member passes.',
+                    true
+                );
+                return;
             }
 
-            html = html + '<tr>' +
-                '<td>' + p.member_pass_id + '</td>' +
-                '<td>' + escapeHtml(p.member_name) + '</td>' +
-                '<td>' + escapeHtml(p.package_name) + '</td>' +
-                '<td>' + formatNumber(p.remaining_hours) + ' / ' + formatNumber(p.package_hours) + '</td>' +
-                '<td>' + formatDateOnly(p.expires_on) + '</td>' +
-                '<td>' + state + '</td>' +
-                '<td class="actions">' + button + '</td></tr>';
+            if (!confirm('Are you sure you want to remove this member pass?')) {
+                return;
+            }
+
+            try {
+                var result = await callApi(
+                    '/member-passes/' + id,
+                    'DELETE'
+                );
+
+                // Refresh the table before displaying success.
+                await loadPasses();
+
+                showMessage(
+                    result.message || 'Member pass removed successfully.',
+                    false
+                );
+
+            } catch (error) {
+                showMessage(error.message, true);
+            }
         }
-        if (result.data.length === 0) {
-            html = '<tr><td colspan="7" class="empty">No passes found.</td></tr>';
+
+
+        // =====================================================
+        // START PAGE
+        // =====================================================
+
+        currentUser = startPage('member_passes.html');
+
+        if (currentUser) {
+
+            isAdmin = currentUser.role === 'Admin';
+
+            isStaff =
+                isAdmin ||
+                currentUser.role === 'Staff';
+
+            if (isStaff) {
+
+                loadChoices().catch(function (error) {
+                    console.error('Unable to load assignment choices:', error);
+                });
+
+            } else {
+
+                // Members cannot assign or remove passes.
+                document.getElementById('assignCard').style.display = 'none';
+
+                document.getElementById('listTitle').textContent = 'My Passes';
+            }
+
+            // Load passes for the logged-in user.
+            loadPasses();
         }
-        document.getElementById('rows').innerHTML = html;
-        hideBanner();
-    } catch (error) {
-        showError(error.message);
-    }
-}
 
-async function assignPass() {
-    try {
-        var body = {
-            user_id: document.getElementById('memberSelect').value,
-            package_id: document.getElementById('packageSelect').value
-        };
-        var result = await callApi('/member-passes', 'POST', body);
-        showMessage(result.message, false);
-        loadPasses();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
+    </script>
 
-async function removePass(id) {
-    if (confirm('Remove this pass?') === false) {
-        return;
-    }
-    try {
-        var result = await callApi('/member-passes/' + id, 'DELETE');
-        showMessage(result.message, false);
-        loadPasses();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
-
-// ---- start the page ----
-currentUser = startPage('member_passes.html');
-if (currentUser) {
-    isStaff = (currentUser.role !== 'Member');
-
-    if (isStaff) {
-        loadChoices().catch(function (error) {
-            showMessage(error.message, true);
-        });
-    } else {
-        document.getElementById('assignCard').style.display = 'none';
-        document.getElementById('listTitle').textContent = 'My passes';
-    }
-    loadPasses();
-}
-</script>
 </body>
 </html>
