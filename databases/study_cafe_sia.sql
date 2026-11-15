@@ -3,23 +3,41 @@ USE study_cafe_sia;
 
 -- ROLES TABLE
 CREATE TABLE roles (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(30) UNIQUE NOT NULL
+    role_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(30) NOT NULL UNIQUE
 );
+
+--roles sample data
+INSERT INTO roles (role_id, name) VALUES (1, 'Admin'), (2, 'Staff'), (3, 'Member');
+
+INSERT INTO users (user_id, name, email, password, role_id) VALUES
+(1, 'Cafe Admin',  'admin@studycafe.com', '$2a$10$WvCi9AfuBTQ5eDKSGrP33uFUmKpnTqZJo1MiIRTY2UempWny4BCSe', 1),
+(2, 'Cafe Staff',  'staff@studycafe.com', '$2a$10$f7NfcZfZpHfP3l360LzZSuP86.tJHiqT3xWeOe1FeiOclVIKQtfzK', 2),
+(3, 'Nicole Ed Caeley Pastrana','nicolay@studycafe.com', '$2a$10$12avytslgxYhkY2a7X3JO.C.RHn8CpYLOvbQjCB2JRAt6Stf1A5OS', 3),
+(4, 'Carlito Javier','carlito@studycafe.com','$2a$10$12avytslgxYhkY2a7X3JO.C.RHn8CpYLOvbQjCB2JRAt6Stf1A5OS', 3),
+(5, 'Rex Malingin',   'cbrowny@studycafe.com',   '$2a$10$12avytslgxYhkY2a7X3JO.C.RHn8CpYLOvbQjCB2JRAt6Stf1A5OS', 3);
+
 
 -- USERS TABLE
 CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role_id INT NOT NULL,
-    FOREIGN KEY (role_id) REFERENCES roles(id)
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(role_id)
 );
 
-INSERT INTO roles (name)
-VALUES ('admin'), ('staff'), ('customer');
 
+--TOKEN BLACKLIST TABLE
+CREATE TABLE token_blacklist (
+    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 -- =========================================
 -- MEMBER D: PASS PACKAGES AND MEMBER PASSES
