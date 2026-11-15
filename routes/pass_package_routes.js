@@ -1,21 +1,13 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const passPackage = require('../controllers/pass_package_controller');
+const { authenticateToken, isAdmin } = require('../middleware/auth_middleware');
 
-const PassPackageController = require('../controllers/pass_package_controller');
+router.use(authenticateToken);
 
-// Get all pass packages
-router.get('/', PassPackageController.getAll);
-
-// Get one pass package
-router.get('/:id', PassPackageController.getById);
-
-// Create a pass package
-router.post('/', PassPackageController.create);
-
-// Update a pass package
-router.put('/:id', PassPackageController.update);
-
-// Delete a pass package
-router.delete('/:id', PassPackageController.remove);
+router.get('/', passPackage.getAll);
+router.get('/:id', passPackage.getById);
+router.post('/', isAdmin, passPackage.create);
+router.put('/:id', isAdmin, passPackage.update);
+router.delete('/:id', isAdmin, passPackage.remove);
 
 module.exports = router;

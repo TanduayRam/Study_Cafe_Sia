@@ -1,27 +1,12 @@
-
 const dashboardModel = require('../models/dashboard_model');
+const { sendSuccess } = require('../utils/http');
 
-// GET DASHBOARD SUMMARY
-const getDashboardSummary = async (req, res) => {
+// GET /dashboard/summary
+exports.getSummary = async function (req, res, next) {
     try {
-        const summary = await dashboardModel.getDashboardSummary();
-
-        return res.status(200).json({
-            success: true,
-            message: 'Dashboard summary retrieved successfully.',
-            data: summary
-        });
-
+        const summary = await dashboardModel.getSummary();
+        return sendSuccess(res, summary, 'Dashboard summary retrieved.');
     } catch (error) {
-        console.error('Dashboard Error:', error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve dashboard summary.'
-        });
+        next(error);
     }
-};
-
-module.exports = {
-    getDashboardSummary
 };

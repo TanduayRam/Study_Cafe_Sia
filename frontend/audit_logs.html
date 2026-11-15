@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Audit & Sessions</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Audit & Sessions</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <div class="toolbar">
+        <h2>Audit log (newest first)</h2>
+        <select id="tableFilter" onchange="loadAll()" style="width:auto">
+            <option value="">All tables</option>
+            <option>reservations</option><option>payments</option><option>member_passes</option>
+            <option>alerts</option><option>orders</option><option>users</option>
+        </select>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>When</th><th>User</th><th>Action</th><th>Table</th><th>Record</th><th>Details</th></tr></thead>
+            <tbody id="auditRows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Session logs</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Reservation</th><th>Member</th><th>Zone / seat</th><th>Started</th><th>Expected end</th><th>Ended</th><th>Status</th></tr></thead>
+            <tbody id="sessionRows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+async function loadAll() {
+    try {
+        showLoading();
+
+        // 1. The audit log
+        var path = '/audit-logs';
+        var table = document.getElementById('tableFilter').value;
+        if (table) {
+            path = path + '?table_name=' + table;
+        }
+        var audit = await callApi(path);
+
+        var html = '';
+        for (var i = 0; i < audit.data.length; i++) {
+            var a = audit.data[i];
+
+            // An empty user means the System did it automatically.
+            var who = '<span class="badge b-blue">System</span>';
+            if (a.user_id) {
+                who = escapeHtml(a.user_name);
+            }
+
+            html = html + '<tr>' +
+                '<td>' + formatDate(a.created_at) + '</td>' +
+                '<td>' + who + '</td>' +
+                '<td>' + escapeHtml(a.action) + '</td>' +
+                '<td>' + escapeHtml(a.table_name) + '</td>' +
+                '<td>' + escapeHtml(a.record_id) + '</td>' +
+                '<td>' + escapeHtml(a.details) + '</td></tr>';
+        }
+        if (audit.data.length === 0) {
+            html = '<tr><td colspan="6" class="empty">No audit records found.</td></tr>';
+        }
+        document.getElementById('auditRows').innerHTML = html;
+
+        // 2. The session logs
+        var sessions = await callApi('/session-logs');
+        html = '';
+        for (var j = 0; j < sessions.data.length; j++) {
+            var s = sessions.data[j];
+            var seat = '-';
+            if (s.seat_label) seat = s.seat_label;
+
+            html = html + '<tr>' +
+                '<td>' + s.session_log_id + '</td>' +
+                '<td>' + escapeHtml(s.reservation_id) + '</td>' +
+                '<td>' + escapeHtml(s.member_name) + '</td>' +
+                '<td>' + escapeHtml(s.zone_name) + ' - ' + escapeHtml(seat) + '</td>' +
+                '<td>' + formatDate(s.start_time) + '</td>' +
+                '<td>' + formatDate(s.expected_end_time) + '</td>' +
+                '<td>' + formatDate(s.end_time) + '</td>' +
+                '<td>' + badge(s.status) + '</td></tr>';
+        }
+        if (sessions.data.length === 0) {
+            html = '<tr><td colspan="8" class="empty">No session logs yet.</td></tr>';
+        }
+        document.getElementById('sessionRows').innerHTML = html;
+
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('audit_logs.html');
+if (currentUser) {
+    loadAll();
+}
+</script>
+</body>
+</html>

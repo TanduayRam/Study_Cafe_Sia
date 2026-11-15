@@ -1,86 +1,62 @@
 const snapshotModel = require('../models/report_snapshot_model');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-const createSnapshot = async (req, res) => {
+// GET /report-snapshots
+exports.getAll = async function (req, res, next) {
     try {
-        const { title, report_data } = req.body;
+        const snapshots = await snapshotModel.getAll();
+        return sendSuccess(res, snapshots, 'Report snapshots retrieved.');
+    } catch (error) {
+        next(error);
+    }
+};
 
-        if (!title || report_data === undefined || report_data === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'Title and report_data are required.'
-            });
+// GET /report-snapshots/:id
+exports.getById = async function (req, res, next) {
+    try {
+        const snapshot = await snapshotModel.getById(toId(req.params.id, 'Snapshot ID'));
+
+        if (!snapshot) {
+            throw createError(404, 'Snapshot not found.');
         }
 
-        const snapshotId = await snapshotModel.createSnapshot(
-            title,
-            report_data
-        );
-
-        return res.status(201).json({
-            success: true,
-            message: 'Report snapshot saved successfully.',
-            data: {
-                snapshot_id: snapshotId
-            }
-        });
-
+        return sendSuccess(res, snapshot, 'Report snapshot retrieved.');
     } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to save report snapshot.'
-        });
+        next(error);
     }
 };
 
-const getAllSnapshots = async (req, res) => {
+// POST /report-snapshots   with { title, report_data }
+exports.create = async function (req, res, next) {
     try {
-        const snapshots = await snapshotModel.getAllSnapshots();
+        const body = req.body || {};
 
-        return res.status(200).json({
-            success: true,
-            data: snapshots
-        });
+        if (isBlank(body.title) || String(body.title).length > 150) {
+            throw createError(400, 'A title is required (150 characters at most).');
+        }
+        if (body.report_data === undefined || body.report_data === null) {
+            throw createError(400, 'report_data is required.');
+        }
 
+        const snapshot = await snapshotModel.create(String(body.title).trim(), body.report_data, req.user.user_id);
+        return sendSuccess(res, snapshot, 'Report snapshot saved.', 201);
     } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve report snapshots.'
-        });
+        next(error);
     }
 };
 
-const deleteSnapshot = async (req, res) => {
+// DELETE /report-snapshots/:id
+exports.remove = async function (req, res, next) {
     try {
-        const deleted = await snapshotModel.deleteSnapshot(req.params.id);
+        const id = toId(req.params.id, 'Snapshot ID');
+        const deleted = await snapshotModel.remove(id);
 
         if (!deleted) {
-            return res.status(404).json({
-                success: false,
-                message: 'Snapshot not found.'
-            });
+            throw createError(404, 'Snapshot not found.');
         }
 
-        return res.status(200).json({
-            success: true,
-            message: 'Report snapshot deleted successfully.'
-        });
-
+        return sendSuccess(res, { snapshot_id: id }, 'Report snapshot deleted.');
     } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to delete report snapshot.'
-        });
+        next(error);
     }
-};
-
-module.exports = {
-    createSnapshot,
-    getAllSnapshots,
-    deleteSnapshot
 };

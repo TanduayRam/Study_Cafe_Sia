@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Dashboard</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Dashboard</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="grid">
+    <div class="stat"><div class="n" id="sessions">0</div><div class="l">Active sessions</div></div>
+    <div class="stat"><div class="n" id="seats">0</div><div class="l">Available seats</div></div>
+    <div class="stat"><div class="n" id="alerts">0</div><div class="l">Open alerts</div></div>
+    <div class="stat"><div class="n" id="lowstock">0</div><div class="l">Low-stock items</div></div>
+    <div class="stat"><div class="n" id="revenue">0</div><div class="l">Today's revenue (pass + cash)</div></div>
+    <div class="stat"><div class="n" id="rating">0</div><div class="l">Average rating</div></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+    <div class="toolbar">
+        <h2>Zone occupancy</h2>
+        <div>
+            <button class="btn" onclick="loadSummary()">Refresh</button>
+            <button class="btn primary" onclick="saveSnapshot()">Save snapshot</button>
+        </div>
+    </div>
+    <div id="zones"></div>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var summary = null;   // the numbers we got from the API
+
+async function loadSummary() {
+    try {
+        showLoading();
+        var result = await callApi('/dashboard/summary');
+        summary = result.data;
+
+        document.getElementById('sessions').textContent = summary.active_sessions;
+        document.getElementById('seats').textContent = summary.available_seats;
+        document.getElementById('alerts').textContent = summary.open_alerts;
+        document.getElementById('lowstock').textContent = summary.low_stock_items;
+        document.getElementById('revenue').textContent = formatMoney(summary.todays_revenue);
+        document.getElementById('rating').textContent = Number(summary.average_rating).toFixed(2) + ' / 5';
+
+        // One progress bar per zone.
+        var html = '';
+        for (var i = 0; i < summary.zone_occupancy.length; i++) {
+            var z = summary.zone_occupancy[i];
+            var width = z.percent;
+            if (width > 100) width = 100;
+
+            html = html + '<div style="margin:10px 0">' +
+                '<div>' + escapeHtml(z.name) + ' - ' + z.occupied + '/' + z.capacity + ' seats (' + z.percent + '%)</div>' +
+                '<div class="bar"><span style="width:' + width + '%"></span></div></div>';
+        }
+        if (summary.zone_occupancy.length === 0) {
+            html = '<div class="empty">No zones yet.</div>';
+        }
+        document.getElementById('zones').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// Saves the numbers on screen as a report snapshot.
+async function saveSnapshot() {
+    try {
+        var title = prompt('Snapshot title:', 'Dashboard ' + new Date().toLocaleString());
+        if (!title) {
+            return;
+        }
+        await callApi('/report-snapshots', 'POST', { title: title, report_data: summary });
+        showMessage('Snapshot saved. See it under Join Reports.', false);
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('dashboard.html');
+if (currentUser) {
+    loadSummary();
+}
+</script>
+</body>
+</html>
