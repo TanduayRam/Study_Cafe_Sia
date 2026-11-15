@@ -1,4 +1,3 @@
-100%
 const router = require('express').Router();
 const sessionLogs = require('../controllers/session_logs_controller');
 const { authenticateToken, isAdmin, isAdminOrStaff } = require('../middleware/auth_middleware');

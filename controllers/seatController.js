@@ -1,95 +1,123 @@
 const seatModel = require('../models/seatModel');
+const zoneModel = require('../models/studyZoneModel');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-const getAll = async (req, res) => {
+const SEAT_STATUSES = ['Available', 'Occupied', 'Maintenance'];
+
+// Used by POST, PUT and PATCH.
+// "existing" is the old seat (only for update). A field that was not sent keeps its old value.
+async function cleanSeat(body, existing) {
+    let zoneId = body.zone_id;
+    let label = body.label;
+    let status = body.status;
+
+    if (existing) {
+        if (zoneId === undefined) zoneId = existing.zone_id;
+        if (label === undefined) label = existing.label;
+        if (status === undefined) status = existing.status;
+    }
+    if (status === undefined) status = 'Available';
+
+    if (isBlank(label)) {
+        throw createError(400, 'Seat label is required.');
+    }
+    if (SEAT_STATUSES.includes(status) === false) {
+        throw createError(400, 'Seat status must be one of: ' + SEAT_STATUSES.join(', ') + '.');
+    }
+
+    zoneId = toId(zoneId, 'Zone ID');
+    const zone = await zoneModel.getById(zoneId);
+    if (!zone) {
+        throw createError(400, 'The selected study zone does not exist.');
+    }
+
+    return { zone_id: zoneId, label: String(label).trim(), status: status };
+}
+
+// GET /seats   (optional ?zone_id=1&status=Available)
+exports.getAll = async function (req, res, next) {
     try {
-        const seats = await seatModel.getAll();
-        res.status(200).json(seats);
+        const filters = {};
+
+        if (req.query.zone_id) {
+            filters.zone_id = toId(req.query.zone_id, 'Zone ID');
+        }
+        if (req.query.status) {
+            if (SEAT_STATUSES.includes(req.query.status) === false) {
+                throw createError(400, 'Seat status must be one of: ' + SEAT_STATUSES.join(', ') + '.');
+            }
+            filters.status = req.query.status;
+        }
+
+        const seats = await seatModel.getAll(filters);
+        return sendSuccess(res, seats, 'Seats retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const getById = async (req, res) => {
+// GET /seats/:id
+exports.getById = async function (req, res, next) {
     try {
-        const seat = await seatModel.getById(req.params.id);
+        const seat = await seatModel.getById(toId(req.params.id, 'Seat ID'));
 
         if (!seat) {
-            return res.status(404).json({ message: 'Seat not found' });
+            throw createError(404, 'Seat not found.');
         }
 
-        res.status(200).json(seat);
+        return sendSuccess(res, seat, 'Seat retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const create = async (req, res) => {
+// POST /seats
+exports.create = async function (req, res, next) {
     try {
-        const { study_zone_id, label, status } = req.body;
-
-        if (!study_zone_id || !label || !label.trim() || !status) {
-            return res.status(400).json({
-                message: 'Study zone, seat label, and status are required.'
-            });
-        }
-
-        const result = await seatModel.create(req.body);
-        res.status(201).json(result);
+        const clean = await cleanSeat(req.body || {}, null);
+        const seat = await seatModel.create(clean);
+        return sendSuccess(res, seat, 'Seat created.', 201);
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({
-                message: 'This seat label already exists in this study zone.'
-            });
-        }
-
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const update = async (req, res) => {
+// PUT /seats/:id and PATCH /seats/:id
+exports.update = async function (req, res, next) {
     try {
-        const existing = await seatModel.getById(req.params.id);
+        const id = toId(req.params.id, 'Seat ID');
 
+        const existing = await seatModel.getById(id);
         if (!existing) {
-            return res.status(404).json({ message: 'Seat not found' });
+            throw createError(404, 'Seat not found.');
         }
 
-        const result = await seatModel.update(req.params.id, req.body);
-        res.status(200).json({ message: 'Seat updated successfully' });
+        const clean = await cleanSeat(req.body || {}, existing);
+        const seat = await seatModel.update(id, clean);
+        return sendSuccess(res, seat, 'Seat updated.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const remove = async (req, res) => {
+// DELETE /seats/:id
+exports.remove = async function (req, res, next) {
     try {
-        const result = await seatModel.remove(req.params.id);
+        const id = toId(req.params.id, 'Seat ID');
 
-        if (!result) {
-            return res.status(404).json({ message: 'Seat not found' });
+        const seat = await seatModel.getById(id);
+        if (!seat) {
+            throw createError(404, 'Seat not found.');
         }
 
-        res.status(200).json({ message: 'Seat deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-// Get seats without active reservations
-const getSeatsWithoutActiveReservation = async (req, res) => {
-    try {
-        const seats = await seatModel.getSeatsWithoutActiveReservation();
+        const reservationCount = await seatModel.countReservations(id);
+        if (reservationCount > 0) {
+            throw createError(400, 'This seat has reservations, so it cannot be deleted. Set it to Maintenance instead.');
+        }
 
-        res.status(200).json(seats);
+        await seatModel.remove(id);
+        return sendSuccess(res, { seat_id: id }, 'Seat deleted.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
-};
-
-module.exports = {
-    getAll,
-    getById,
-    create,
-    update,
-    remove,
-    getSeatsWithoutActiveReservation
 };

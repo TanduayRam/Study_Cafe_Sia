@@ -1,593 +1,178 @@
 const reservationModel = require('../models/reservationModel');
-const seatModel = require('../models/seatModel');
-const studyZoneModel = require('../models/studyZoneModel');
-const db = require('../config/databases');
+const checkoutModel = require('../models/checkout_model');
+const User = require('../models/user_model');
+const { createError, sendSuccess, toId, toDate, isBlank } = require('../utils/http');
 
-// Check whether the logged-in user owns a reservation.
-const isOwner = (reservation, user) => {
-    return Number(reservation.user_id) === Number(user.id);
-};
+const STATUSES = ['Confirmed', 'CheckedIn', 'Completed', 'Cancelled', 'NoShow'];
+const PAYMENT_METHODS = ['Cash', 'GCash', 'Card'];
 
-// Get all reservations
-const getAll = async (req, res) => {
-    try {
-        const reservations = await reservationModel.getAll();
+// Admin and Staff are "staff". A Member is not.
+function isStaff(user) {
+    return user.role === 'Admin' || user.role === 'Staff';
+}
 
-        return res.status(200).json(reservations);
-
-    } catch (error) {
-        console.error('Get reservations error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to retrieve reservations.'
-        });
+// A Member may only touch their own reservations.
+function checkOwnerOrStaff(reservation, user) {
+    if (isStaff(user) === false && reservation.user_id !== user.user_id) {
+        throw createError(403, 'You can only access your own reservations.');
     }
-};
+}
 
-// Get one reservation
-const getById = async (req, res) => {
-    try {
-        const reservation = await reservationModel.getById(req.params.id);
+// Reads the id from the address and finds the reservation. Throws 404 if it does not exist.
+async function loadReservation(req) {
+    const reservation = await reservationModel.getById(toId(req.params.id, 'Reservation ID'));
 
-        if (!reservation) {
-            return res.status(404).json({
-                message: 'Reservation not found.'
-            });
-        }
-
-        // Customers can only access their own reservations.
-        if (
-            req.user.role === 'customer' &&
-            !isOwner(reservation, req.user)
-        ) {
-            return res.status(403).json({
-                message: 'You can only access your own reservations.'
-            });
-        }
-
-        return res.status(200).json(reservation);
-
-    } catch (error) {
-        console.error('Get reservation error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to retrieve reservation.'
-        });
+    if (!reservation) {
+        throw createError(404, 'Reservation not found.');
     }
-};
+    return reservation;
+}
 
-// Create a reservation
-const create = async (req, res) => {
+// GET /reservations   (optional ?status=Confirmed)
+exports.getAll = async function (req, res, next) {
     try {
-        const {
-            user_id,
-            seat_id,
-            start_time,
-            end_time
-        } = req.body;
+        const filters = {};
 
-        // Customers must use their authenticated account ID.
-        const reservationUserId =
-            req.user.role === 'customer' ? req.user.id : user_id;
-
-        if (!reservationUserId || !seat_id || !start_time || !end_time) {
-            return res.status(400).json({
-                message: 'User, seat, start time, and end time are required.'
-            });
-        }
- 
-        const start = new Date(start_time);
-        const end = new Date(end_time);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            return res.status(400).json({
-                message: 'Invalid reservation date or time.'
-            });
-        }
-
-        if (end <= start) {
-            return res.status(400).json({
-                message: 'End time must be later than start time.'
-            });
-        }
- 
-        const duration = (end - start) / (1000 * 60 * 60);
-
-        if (duration < 1) {
-            return res.status(400).json({
-                message: 'Minimum reservation duration is 1 hour.'
-            });
-        }
-
-        // Check whether the user exists.
-        const [users] = await db.query(
-            'SELECT id FROM users WHERE id = ?',
-            [reservationUserId]
-        );
-
-        if (users.length === 0) {
-            return res.status(404).json({
-                message: 'User not found.'
-            });
-        }
-
-        // Check whether the seat exists.
-        const seat = await seatModel.getById(seat_id);
-
-        if (!seat) {
-            return res.status(404).json({
-                message: 'Seat not found.'
-            });
-        }
-
-        if (seat.status !== 'Available') {
-            return res.status(400).json({
-                message: 'This seat is not available.'
-            });
-        }
-
-        // Check the study zone.
-        const zone = await studyZoneModel.getById(seat.study_zone_id);
-
-        if (!zone) {
-            return res.status(404).json({
-                message: 'Study zone not found.'
-            });
-        }
-
-         if (duration > zone.max_hours) {
-            return res.status(400).json({
-                message: `Maximum reservation duration for this zone is ${zone.max_hours} hours.`
-            });
-        }
-
-        // Check for overlapping reservations.
-        const [conflicts] = await db.query(
-            `SELECT reservation_id
-             FROM reservations
-             WHERE seat_id = ?
-             AND status IN ('Confirmed', 'CheckedIn')
-             AND start_time < ?
-             AND end_time > ?`,
-            [seat_id, end_time, start_time]
-        );
-
-        if (conflicts.length > 0) {
-            return res.status(400).json({
-                message: 'This seat already has a reservation during that time.'
-            });
-        }
-
-         const reservation = await reservationModel.create({
-            user_id: reservationUserId,
-            seat_id,
-            start_time,
-            end_time
-        });
-
-        return res.status(201).json(reservation);
-
-    } catch (error) {
-        console.error('Create reservation error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to create reservation.'
-        });
-    }
-};
- 
- // Update a reservation
- const update = async (req, res) => {
-    try {
-        const id = req.params.id;
-
-         const existing = await reservationModel.getById(id);
-
-        if (!existing) {
-            return res.status(404).json({
-                message: 'Reservation not found.'
-            });
-        }
-
-        // Customers can only update their own reservations.
-        if (
-            req.user.role === 'customer' &&
-            !isOwner(existing, req.user)
-        ) {
-            return res.status(403).json({
-                message: 'You can only update your own reservations.'
-            });
-        }
-
-        if (existing.status !== 'Confirmed') {
-            return res.status(400).json({
-                message: 'Only confirmed reservations can be updated.'
-            });
-        }
-
-        const { seat_id, start_time, end_time } = req.body;
-
-         if (!seat_id || !start_time || !end_time) {
-            return res.status(400).json({
-                message: 'Seat, start time, and end time are required.'
-            });
-        }
- 
-        const start = new Date(start_time);
-        const end = new Date(end_time);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            return res.status(400).json({
-                message: 'Invalid reservation date or time.'
-            });
-        }
-
-        if (end <= start) {
-            return res.status(400).json({
-                message: 'End time must be later than start time.'
-            });
-        }
-
-         const duration = (end - start) / (1000 * 60 * 60);
-
-        if (duration < 1) {
-            return res.status(400).json({
-                message: 'Minimum reservation duration is 1 hour.'
-            });
-        }
-
-        // Check whether the seat exists.
-        const seat = await seatModel.getById(seat_id);
-
-        if (!seat) {
-            return res.status(404).json({
-                message: 'Seat not found.'
-            });
-        }
-
-        if (seat.status !== 'Available') {
-            return res.status(400).json({
-                message: 'This seat is not available.'
-            });
-        }
-
-        // Check the study zone.
-        const zone = await studyZoneModel.getById(seat.study_zone_id);
-
-        if (!zone) {
-            return res.status(404).json({
-                message: 'Study zone not found.'
-            });
-        }
- 
-        if (duration > zone.max_hours) {
-            return res.status(400).json({
-                message: `Maximum reservation duration for this zone is ${zone.max_hours} hours.`
-            });
-        }
-
-        // Check for overlapping reservations, excluding the current reservation.
-        const [conflicts] = await db.query(
-            `SELECT reservation_id
-             FROM reservations
-             WHERE seat_id = ?
-             AND reservation_id != ?
-             AND status IN ('Confirmed', 'CheckedIn')
-             AND start_time < ?
-             AND end_time > ?`,
-            [seat_id, id, end_time, start_time]
-        );
-
-        if (conflicts.length > 0) {
-            return res.status(400).json({
-                message: 'This seat already has a reservation during that time.'
-            });
-        }
- 
-        await reservationModel.update(id, {
-            user_id: existing.user_id,
-            seat_id,
-            start_time,
-            end_time,
-            status: existing.status
-        });
-
-         const updated = await reservationModel.getById(id);
-
-        return res.status(200).json(updated);
-
-    } catch (error) {
-        console.error('Update reservation error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to update reservation.'
-        });
-    }
-};
-
-// Check in a reservation
-const checkIn = async (req, res) => {
-    let connection;
-
-    try {
-        connection = await db.getConnection();
-
-        await connection.beginTransaction();
-
-        const [rows] = await connection.query(
-            'SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE',
-            [req.params.id]
-        );
-
-        if (rows.length === 0) {
-            await connection.rollback();
-
-            return res.status(404).json({
-                message: 'Reservation not found.'
-            });
-        }
-
-        const reservation = rows[0];
-
-        if (reservation.status !== 'Confirmed') {
-            await connection.rollback();
-
-            return res.status(400).json({
-                message: 'Only confirmed reservations can be checked in.'
-            });
-        }
-
-        await connection.query(
-            `UPDATE reservations
-             SET status = 'CheckedIn'
-             WHERE reservation_id = ?`,
-            [req.params.id]
-        );
-
-        await connection.query(
-            `UPDATE seats
-             SET status = 'Occupied'
-             WHERE seat_id = ?`,
-            [reservation.seat_id]
-        );
-
-        await connection.commit();
-
-        return res.status(200).json({
-            message: 'Customer checked in successfully.',
-            reservation_id: reservation.reservation_id,
-            seat_id: reservation.seat_id,
-            status: 'CheckedIn',
-            seat_status: 'Occupied'
-        });
-
-    } catch (error) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                console.error('Check-in rollback error:', rollbackError);
+        if (req.query.status) {
+            if (STATUSES.includes(req.query.status) === false) {
+                throw createError(400, 'Status must be one of: ' + STATUSES.join(', ') + '.');
             }
+            filters.status = req.query.status;
         }
 
-        console.error('Check-in error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to check in reservation.'
-        });
-
-    } finally {
-        if (connection) {
-            connection.release();
-        }
-    }
-};
-
-// Check out a reservation
-const checkOut = async (req, res) => {
-    let connection;
-
-    try {
-        connection = await db.getConnection();
-
-        await connection.beginTransaction();
-
-        const [rows] = await connection.query(
-            'SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE',
-            [req.params.id]
-        );
-
-        if (rows.length === 0) {
-            await connection.rollback();
-
-            return res.status(404).json({
-                message: 'Reservation not found.'
-            });
+        // A Member always sees only their own bookings.
+        if (isStaff(req.user) === false) {
+            filters.user_id = req.user.user_id;
+        } else if (req.query.user_id) {
+            filters.user_id = toId(req.query.user_id, 'User ID');
         }
 
-        const reservation = rows[0];
-
-        if (reservation.status !== 'CheckedIn') {
-            await connection.rollback();
-
-            return res.status(400).json({
-                message: 'Only checked-in reservations can be checked out.'
-            });
-        }
-
-        await connection.query(
-            `UPDATE reservations
-             SET status = 'Completed'
-             WHERE reservation_id = ?`,
-            [req.params.id]
-        );
-
-        await connection.query(
-            `UPDATE seats
-             SET status = 'Available'
-             WHERE seat_id = ?`,
-            [reservation.seat_id]
-        );
-
-        await connection.commit();
-
-        return res.status(200).json({
-            message: 'Customer checked out successfully.',
-            reservation_id: reservation.reservation_id,
-            seat_id: reservation.seat_id,
-            status: 'Completed',
-            seat_status: 'Available'
-        });
-
+        const list = await reservationModel.getAll(filters);
+        return sendSuccess(res, list, 'Reservations retrieved.');
     } catch (error) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                console.error('Check-out rollback error:', rollbackError);
-            }
-        }
-
-        console.error('Check-out error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to check out reservation.'
-        });
-
-    } finally {
-        if (connection) {
-            connection.release();
-        }
+        next(error);
     }
 };
 
-// Cancel a reservation
-const remove = async (req, res) => {
-    let connection;
-
+// GET /reservations/:id
+exports.getById = async function (req, res, next) {
     try {
-        connection = await db.getConnection();
-
-        await connection.beginTransaction();
-
-        const [rows] = await connection.query(
-            'SELECT * FROM reservations WHERE reservation_id = ? FOR UPDATE',
-            [req.params.id]
-        );
-
-        if (rows.length === 0) {
-            await connection.rollback();
-
-            return res.status(404).json({
-                message: 'Reservation not found.'
-            });
-        }
-
-        const reservation = rows[0];
-        const userRole = req.user.role;
-
-        // Only administrators and customers can cancel reservations.
-        if (!['admin', 'customer'].includes(userRole)) {
-            await connection.rollback();
-
-            return res.status(403).json({
-                message: 'You do not have permission to cancel reservations.'
-            });
-        }
-
-        // Customers can only cancel their own reservations.
-        if (
-            userRole === 'customer' &&
-            !isOwner(reservation, req.user)
-        ) {
-            await connection.rollback();
-
-            return res.status(403).json({
-                message: 'You can only cancel your own reservations.'
-            });
-        }
-
-        // Customers can only cancel confirmed reservations.
-        if (
-            userRole === 'customer' &&
-            reservation.status !== 'Confirmed'
-        ) {
-            await connection.rollback();
-
-            return res.status(400).json({
-                message: 'Customers can only cancel confirmed reservations.'
-            });
-        }
-
-        // Administrators can cancel confirmed or checked-in reservations.
-        if (
-            userRole === 'admin' &&
-            !['Confirmed', 'CheckedIn'].includes(reservation.status)
-        ) {
-            await connection.rollback();
-
-            return res.status(400).json({
-                message: 'This reservation cannot be cancelled.'
-            });
-        }
-
-        await connection.query(
-            `UPDATE reservations
-             SET status = 'Cancelled'
-             WHERE reservation_id = ?`,
-            [req.params.id]
-        );
-
-        // Release the seat if an administrator cancels a checked-in reservation.
-        if (
-            userRole === 'admin' &&
-            reservation.status === 'CheckedIn'
-        ) {
-            await connection.query(
-                `UPDATE seats
-                 SET status = 'Available'
-                 WHERE seat_id = ?`,
-                [reservation.seat_id]
-            );
-        }
-
-        await connection.commit();
-
-        return res.status(200).json({
-            message: 'Reservation cancelled successfully.',
-            reservation_id: reservation.reservation_id,
-            status: 'Cancelled'
-        });
-
+        const reservation = await loadReservation(req);
+        checkOwnerOrStaff(reservation, req.user);
+        return sendSuccess(res, reservation, 'Reservation retrieved.');
     } catch (error) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                console.error('Cancellation rollback error:', rollbackError);
-            }
-        }
-
-        console.error('Reservation cancellation error:', error);
-
-        return res.status(500).json({
-            message: 'Failed to cancel reservation.'
-        });
-
-    } finally {
-        if (connection) {
-            connection.release();
-        }
+        next(error);
     }
 };
 
-// Export reservation controller functions
-module.exports = {
-    getAll,
-    getById,
-    create,
-    update,
-    checkIn,
-    checkOut,
-    remove
- };
+// POST /reservations   with { user_id (staff only), seat_id, start_time, end_time }
+exports.create = async function (req, res, next) {
+    try {
+        const body = req.body || {};
+
+        // A Member books for themselves. Staff choose the member.
+        let userId = req.user.user_id;
+        if (isStaff(req.user)) {
+            userId = toId(body.user_id, 'Member');
+        }
+
+        const seatId = toId(body.seat_id, 'Seat');
+        const start = toDate(body.start_time, 'Start time');
+        const end = toDate(body.end_time, 'End time');
+
+        const member = await User.getById(userId);
+        if (!member) {
+            throw createError(404, 'Member not found.');
+        }
+        if (!member.is_active) {
+            throw createError(400, 'This member account is deactivated.');
+        }
+
+        const reservation = await reservationModel.create(
+            { user_id: userId, seat_id: seatId, start: start, end: end },
+            req.user.user_id
+        );
+
+        return sendSuccess(res, reservation, 'Reservation created.', 201);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// PUT /reservations/:id
+exports.update = async function (req, res, next) {
+    try {
+        const existing = await loadReservation(req);
+        checkOwnerOrStaff(existing, req.user);
+
+        const body = req.body || {};
+
+        // Anything that was not sent keeps its old value.
+        let seatId = existing.seat_id;
+        if (body.seat_id !== undefined) seatId = toId(body.seat_id, 'Seat');
+
+        let startValue = existing.start_time;
+        if (body.start_time !== undefined) startValue = body.start_time;
+
+        let endValue = existing.end_time;
+        if (body.end_time !== undefined) endValue = body.end_time;
+
+        const reservation = await reservationModel.update(
+            existing.reservation_id,
+            { seat_id: seatId, start: toDate(startValue, 'Start time'), end: toDate(endValue, 'End time') },
+            req.user.user_id
+        );
+
+        return sendSuccess(res, reservation, 'Reservation updated.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// DELETE /reservations/:id   = cancel. The row is kept with status Cancelled.
+exports.remove = async function (req, res, next) {
+    try {
+        const id = toId(req.params.id, 'Reservation ID');
+        const reservation = await reservationModel.cancel(id, req.user);
+        return sendSuccess(res, reservation, 'Reservation cancelled.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /reservations/:id/check-in
+exports.checkIn = async function (req, res, next) {
+    try {
+        const id = toId(req.params.id, 'Reservation ID');
+        const reservation = await reservationModel.checkIn(id, req.user.user_id);
+        return sendSuccess(res, reservation, 'Checked in. The seat is now Occupied.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// POST /reservations/:id/check-out   with { payment_method, checkout_time (demo only) }
+exports.checkOut = async function (req, res, next) {
+    try {
+        const id = toId(req.params.id, 'Reservation ID');
+        const body = req.body || {};
+
+        let method = 'Cash';
+        if (isBlank(body.payment_method) === false) {
+            method = String(body.payment_method).trim();
+        }
+        if (PAYMENT_METHODS.includes(method) === false) {
+            throw createError(400, 'Payment method must be one of: ' + PAYMENT_METHODS.join(', ') + '.');
+        }
+
+        let at = new Date();
+        if (body.checkout_time) {
+            at = toDate(body.checkout_time, 'Checkout time');
+        }
+
+        const result = await checkoutModel.checkout(id, method, at, req.user.user_id);
+        return sendSuccess(res, result, 'Check-out complete. Payment saved and the seat is Available.');
+    } catch (error) {
+        next(error);
+    }
+};

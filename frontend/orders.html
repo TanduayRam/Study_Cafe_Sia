@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Order Entry</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Order Entry</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2>New order</h2>
+    <p class="hint">Orders can only be added while the reservation is Checked In. Stock is subtracted when you save.</p>
+    <div class="row">
+        <div><label>Checked-in reservation</label><select id="reservationSelect"></select></div>
+        <div><label>Menu item</label><select id="itemSelect"></select></div>
+        <div><label>Quantity</label><input type="number" id="quantityInput" value="1" min="1"></div>
+        <div><button class="btn" onclick="addToCart()">Add to order</button></div>
+    </div>
+    <div id="cart" style="margin:12px 0"></div>
+    <button class="btn primary" onclick="saveOrder()">Save order</button>
+</div>
+
+<div class="card">
+    <h2>Orders</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Reservation</th><th>Member</th><th>Seat</th><th>Lines</th><th>Total</th><th>Status</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="detailsBox" style="display:none">
+    <h2>Order details</h2>
+    <div id="detailsBody"></div>
+    <button class="btn" onclick="closeDetails()">Close</button>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var menuItems = [];   // all menu items
+var cart = [];        // lines of the order we are building: { item_id, name, price, quantity }
+
+// Fill the dropdowns.
+async function loadChoices() {
+    var menu = await callApi('/menu-items');
+    menuItems = menu.data;
+
+    var html = '';
+    for (var i = 0; i < menuItems.length; i++) {
+        var m = menuItems[i];
+        html = html + '<option value="' + m.item_id + '">' + escapeHtml(m.name) + ' - ' + formatMoney(m.price) + ' (' + m.stock + ' left)</option>';
+    }
+    document.getElementById('itemSelect').innerHTML = html;
+
+    var reservations = await callApi('/reservations?status=CheckedIn');
+    html = '';
+    for (var j = 0; j < reservations.data.length; j++) {
+        var r = reservations.data[j];
+        html = html + '<option value="' + r.reservation_id + '">#' + r.reservation_id + ' ' + escapeHtml(r.member_name) + ' - ' + escapeHtml(r.seat_label) + '</option>';
+    }
+    if (reservations.data.length === 0) {
+        html = '<option value="">No checked-in reservations</option>';
+    }
+    document.getElementById('reservationSelect').innerHTML = html;
+}
+
+// ---- The cart (the order we are building) ----
+
+function drawCart() {
+    if (cart.length === 0) {
+        document.getElementById('cart').innerHTML = '<div class="hint">No items yet.</div>';
+        return;
+    }
+
+    var html = '<table><thead><tr><th>Item</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < cart.length; i++) {
+        var line = cart[i];
+        html = html + '<tr><td>' + escapeHtml(line.name) + '</td><td>' + line.quantity + '</td>' +
+            '<td>' + formatMoney(line.price * line.quantity) + '</td>' +
+            '<td><button class="btn small danger" onclick="removeFromCart(' + line.item_id + ')">Remove</button></td></tr>';
+    }
+    html = html + '</tbody></table>';
+    document.getElementById('cart').innerHTML = html;
+}
+
+function addToCart() {
+    var itemId = Number(document.getElementById('itemSelect').value);
+    var quantity = Number(document.getElementById('quantityInput').value);
+    var item = findById(menuItems, 'item_id', itemId);
+
+    if (!item || !Number.isInteger(quantity) || quantity < 1) {
+        showMessage('Pick an item and a quantity of 1 or more.', true);
+        return;
+    }
+
+    // If the item is already in the cart, add to its quantity.
+    var existing = findById(cart, 'item_id', itemId);
+    if (existing) {
+        existing.quantity = existing.quantity + quantity;
+    } else {
+        cart.push({ item_id: itemId, name: item.name, price: item.price, quantity: quantity });
+    }
+    drawCart();
+}
+
+function removeFromCart(itemId) {
+    var newCart = [];
+    for (var i = 0; i < cart.length; i++) {
+        if (cart[i].item_id !== itemId) {
+            newCart.push(cart[i]);
+        }
+    }
+    cart = newCart;
+    drawCart();
+}
+
+// Sends the whole cart to the API.
+async function saveOrder() {
+    try {
+        var items = [];
+        for (var i = 0; i < cart.length; i++) {
+            items.push({ item_id: cart[i].item_id, quantity: cart[i].quantity });
+        }
+
+        var body = {
+            reservation_id: document.getElementById('reservationSelect').value,
+            items: items
+        };
+        var result = await callApi('/orders', 'POST', body);
+
+        showMessage(result.message, false);
+        cart = [];
+        drawCart();
+        await loadChoices();     // stock changed, refresh the dropdowns
+        loadOrders();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- The orders list ----
+
+async function loadOrders() {
+    try {
+        showLoading();
+        var result = await callApi('/orders');
+
+        var html = '';
+        for (var i = 0; i < result.data.length; i++) {
+            var o = result.data[i];
+
+            var buttons = '<button class="btn small" onclick="showDetails(' + o.order_id + ')">Details</button> ';
+            if (o.status === 'Pending') {
+                buttons = buttons + '<button class="btn small" onclick="markServed(' + o.order_id + ')">Served</button> ' +
+                    '<button class="btn small danger" onclick="cancelOrder(' + o.order_id + ')">Cancel</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + o.order_id + '</td>' +
+                '<td>' + o.reservation_id + '</td>' +
+                '<td>' + escapeHtml(o.member_name) + '</td>' +
+                '<td>' + escapeHtml(o.zone_name) + ' - ' + escapeHtml(o.seat_label) + '</td>' +
+                '<td>' + o.line_count + '</td>' +
+                '<td>' + formatMoney(o.total_amount) + '</td>' +
+                '<td>' + badge(o.status) + '</td>' +
+                '<td class="actions">' + buttons + '</td></tr>';
+        }
+        if (result.data.length === 0) {
+            html = '<tr><td colspan="8" class="empty">No orders found.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+async function markServed(id) {
+    try {
+        var result = await callApi('/orders/' + id + '/status', 'PATCH', { status: 'Served' });
+        showMessage(result.message, false);
+        loadOrders();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function cancelOrder(id) {
+    if (confirm('Cancel this order and return the stock?') === false) {
+        return;
+    }
+    try {
+        var result = await callApi('/orders/' + id, 'DELETE');
+        showMessage(result.message, false);
+        await loadChoices();
+        loadOrders();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- The details box (the lines of one order) ----
+
+async function showDetails(orderId) {
+    try {
+        var result = await callApi('/orders/' + orderId);
+        var order = result.data;
+
+        var html = '<p>Order #' + order.order_id + ' - ' + badge(order.status) + ' - ' + formatMoney(order.total_amount) + '</p>';
+        html = html + '<table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th><th></th></tr></thead><tbody>';
+
+        for (var i = 0; i < order.items.length; i++) {
+            var line = order.items[i];
+            var button = '';
+            if (order.status === 'Pending') {
+                button = '<button class="btn small danger" onclick="removeLine(' + line.order_item_id + ',' + order.order_id + ')">Remove</button>';
+            }
+            html = html + '<tr><td>' + escapeHtml(line.item_name) + '</td><td>' + line.quantity + '</td>' +
+                '<td>' + formatMoney(line.unit_price) + '</td><td>' + formatMoney(line.subtotal) + '</td><td>' + button + '</td></tr>';
+        }
+        html = html + '</tbody></table>';
+
+        // A Pending order can still get more items.
+        if (order.status === 'Pending') {
+            var options = '';
+            for (var j = 0; j < menuItems.length; j++) {
+                options = options + '<option value="' + menuItems[j].item_id + '">' + escapeHtml(menuItems[j].name) + ' (' + menuItems[j].stock + ' left)</option>';
+            }
+            html = html + '<div class="row" style="margin-top:10px">' +
+                '<div><label>Add item</label><select id="addItemSelect">' + options + '</select></div>' +
+                '<div><label>Qty</label><input type="number" id="addQuantity" value="1" min="1"></div>' +
+                '<div><button class="btn primary" onclick="addLine(' + order.order_id + ')">Add</button></div></div>';
+        }
+
+        document.getElementById('detailsBody').innerHTML = html;
+        document.getElementById('detailsBox').style.display = 'block';
+        document.getElementById('detailsBox').scrollIntoView();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+function closeDetails() {
+    document.getElementById('detailsBox').style.display = 'none';
+}
+
+// DELETE /order-items/:id
+async function removeLine(lineId, orderId) {
+    try {
+        await callApi('/order-items/' + lineId, 'DELETE');
+        showMessage('Item removed.', false);
+        await loadChoices();
+        await showDetails(orderId);
+        loadOrders();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// POST /order-items
+async function addLine(orderId) {
+    try {
+        var body = {
+            order_id: orderId,
+            item_id: document.getElementById('addItemSelect').value,
+            quantity: document.getElementById('addQuantity').value
+        };
+        await callApi('/order-items', 'POST', body);
+        showMessage('Item added.', false);
+        await loadChoices();
+        await showDetails(orderId);
+        loadOrders();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('orders.html');
+if (currentUser) {
+    drawCart();
+    loadChoices().catch(function (error) {
+        showMessage(error.message, true);
+    });
+    loadOrders();
+}
+</script>
+</body>
+</html>

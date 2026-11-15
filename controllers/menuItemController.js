@@ -1,70 +1,106 @@
-const menuItemModel = require('../models/menuItemModel');
+const menuModel = require('../models/menuItemModel');
+const { createError, sendSuccess, toId, isBlank } = require('../utils/http');
 
-const getAll = async (req, res) => {
+function validateItem(body) {
+    if (isBlank(body.name) || isBlank(body.category)) {
+        throw createError(400, 'Item name and category are required.');
+    }
+
+    const price = Number(body.price);
+    if (isBlank(body.price) || isNaN(price) || price <= 0) {
+        throw createError(400, 'Price must be a number above 0.');
+    }
+
+    const stock = Number(body.stock);
+    if (isBlank(body.stock) || !Number.isInteger(stock) || stock < 0) {
+        throw createError(400, 'Stock must be a whole number of 0 or more.');
+    }
+
+    // If the reorder level is empty we use 5.
+    let reorder = 5;
+    if (isBlank(body.reorder_level) === false) {
+        reorder = Number(body.reorder_level);
+    }
+    if (!Number.isInteger(reorder) || reorder < 0) {
+        throw createError(400, 'Reorder level must be a whole number of 0 or more.');
+    }
+
+    return {
+        name: String(body.name).trim(),
+        category: String(body.category).trim(),
+        price: price,
+        stock: stock,
+        reorder_level: reorder
+    };
+}
+
+// GET /menu-items
+exports.getAll = async function (req, res, next) {
     try {
-        const items = await menuItemModel.getAll();
-        res.status(200).json(items);
+        const items = await menuModel.getAll();
+        return sendSuccess(res, items, 'Menu items retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const getById = async (req, res) => {
+// GET /menu-items/:id
+exports.getById = async function (req, res, next) {
     try {
-        const item = await menuItemModel.getById(req.params.id);
+        const item = await menuModel.getById(toId(req.params.id, 'Item ID'));
 
         if (!item) {
-            return res.status(404).json({ message: 'Menu item not found' });
+            throw createError(404, 'Menu item not found.');
         }
 
-        res.status(200).json(item);
+        return sendSuccess(res, item, 'Menu item retrieved.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const create = async (req, res) => {
+// POST /menu-items
+exports.create = async function (req, res, next) {
     try {
-        const item = await menuItemModel.create(req.body);
-        res.status(201).json(item);
+        const clean = validateItem(req.body || {});
+        const item = await menuModel.create(clean);
+        return sendSuccess(res, item, 'Menu item created.', 201);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const update = async (req, res) => {
+// PUT /menu-items/:id
+exports.update = async function (req, res, next) {
     try {
-        const existing = await menuItemModel.getById(req.params.id);
+        const id = toId(req.params.id, 'Item ID');
+        const clean = validateItem(req.body || {});
+        const item = await menuModel.update(id, clean);
 
-        if (!existing) {
-            return res.status(404).json({ message: 'Menu item not found' });
+        if (!item) {
+            throw createError(404, 'Menu item not found.');
         }
 
-        const result = await menuItemModel.update(req.params.id, req.body);
-        res.status(200).json({ message: 'Menu item updated successfully' });
+        return sendSuccess(res, item, 'Menu item updated.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-const remove = async (req, res) => {
+// DELETE /menu-items/:id
+exports.remove = async function (req, res, next) {
     try {
-        const result = await menuItemModel.remove(req.params.id);
+        const id = toId(req.params.id, 'Item ID');
 
-        if (!result) {
-            return res.status(404).json({ message: 'Menu item not found' });
+        const item = await menuModel.getById(id);
+        if (!item) {
+            throw createError(404, 'Menu item not found.');
         }
 
-        res.status(200).json({ message: 'Menu item deleted successfully' });
+        // If the item was already ordered, MySQL refuses and the error handler shows a friendly 400.
+        await menuModel.remove(id);
+        return sendSuccess(res, { item_id: id }, 'Menu item deleted.');
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
-};
-
-module.exports = {
-    getAll,
-    getById,
-    create,
-    update,
-    remove
 };

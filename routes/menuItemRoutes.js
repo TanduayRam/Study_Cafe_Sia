@@ -1,12 +1,13 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const menu = require('../controllers/menuItemController');
+const { authenticateToken, isAdmin, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const menuItemController = require('../controllers/menuItemController');
+router.use(authenticateToken);
 
-router.get('/', menuItemController.getAll);
-router.get('/:id', menuItemController.getById);
-router.post('/', menuItemController.create);
-router.put('/:id', menuItemController.update);
-router.delete('/:id', menuItemController.remove);
+router.get('/', menu.getAll);
+router.get('/:id', menu.getById);
+router.post('/', isAdminOrStaff, menu.create);
+router.put('/:id', isAdminOrStaff, menu.update);
+router.delete('/:id', isAdmin, menu.remove);
 
 module.exports = router;

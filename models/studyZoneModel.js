@@ -1,64 +1,57 @@
-
 const db = require('../config/databases');
 
-const getAll = async () => {
+async function getAll() {
     const [rows] = await db.query(
-        'SELECT * FROM study_zones'
+        'SELECT zone_id, name, type, hourly_rate, max_hours, capacity FROM study_zones ORDER BY zone_id'
     );
     return rows;
-};
+}
 
-const getById = async (id) => {
-    const [rows] = await db.query(
-        'SELECT * FROM study_zones WHERE study_zone_id = ?',
+// "connection" is optional. Normally we use the shared db.
+async function getById(id, connection) {
+    if (!connection) connection = db;
+    const [rows] = await connection.query(
+        'SELECT zone_id, name, type, hourly_rate, max_hours, capacity FROM study_zones WHERE zone_id = ?',
         [id]
     );
     return rows[0];
-};
+}
 
-const create = async (zone) => {
-    const { name, type, hourly_rate, max_hours, capacity } = zone;
-
+async function create(data) {
     const [result] = await db.query(
-        `INSERT INTO study_zones
-        (name, type, hourly_rate, max_hours, capacity)
-        VALUES (?, ?, ?, ?, ?)`,
-        [name, type, hourly_rate, max_hours, capacity]
+        'INSERT INTO study_zones (name, type, hourly_rate, max_hours, capacity) VALUES (?, ?, ?, ?, ?)',
+        [data.name, data.type, data.hourly_rate, data.max_hours, data.capacity]
     );
+    return getById(result.insertId);
+}
 
-    return {
-        study_zone_id: result.insertId,
-        ...zone
-    };
-};
-
-const update = async (id, zone) => {
-    const { name, type, hourly_rate, max_hours, capacity } = zone;
-
+async function update(id, data) {
     const [result] = await db.query(
-        `UPDATE study_zones
-        SET name = ?, type = ?, hourly_rate = ?,
-            max_hours = ?, capacity = ?
-        WHERE study_zone_id = ?`,
-        [name, type, hourly_rate, max_hours, capacity, id]
+        'UPDATE study_zones SET name = ?, type = ?, hourly_rate = ?, max_hours = ?, capacity = ? WHERE zone_id = ?',
+        [data.name, data.type, data.hourly_rate, data.max_hours, data.capacity, id]
     );
+    if (result.affectedRows === 0) {
+        return null;
+    }
+    return getById(id);
+}
 
-    return result.affectedRows;
-};
+async function remove(id) {
+    const [result] = await db.query('DELETE FROM study_zones WHERE zone_id = ?', [id]);
+    return result.affectedRows > 0;
+}
 
-const remove = async (id) => {
-    const [result] = await db.query(
-        'DELETE FROM study_zones WHERE study_zone_id = ?',
-        [id]
-    );
-
-    return result.affectedRows;
-};
+// How many seats belong to this zone?
+async function countSeats(id) {
+    const [rows] = await db.query('SELECT COUNT(*) AS total FROM seats WHERE zone_id = ?', [id]);
+    return rows[0].total;
+}
 
 module.exports = {
-    getAll,
-    getById,
-    create,
-    update,
-    remove
+    getAll: getAll,
+    getById: getById,
+    create: create,
+    update: update,
+    remove: remove,
+    countSeats: countSeats
 };
