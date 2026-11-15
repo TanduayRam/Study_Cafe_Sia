@@ -1,13 +1,43 @@
-const router = require('express').Router();
-const order = require('../controllers/orderController');
-const { authenticateToken, isAdminOrStaff } = require('../middleware/auth_middleware');
+const express = require('express');
+const router = express.Router();
 
-router.use(authenticateToken, isAdminOrStaff);
+const orderController = require('../controllers/orderController');
 
-router.get('/', order.getAll);
-router.get('/:id', order.getById);
-router.post('/', order.create);
-router.patch('/:id/status', order.updateStatus);
-router.delete('/:id', order.remove);
+const {
+    authenticateToken,
+    authorizeRoles
+} = require('../middleware/auth_middleware');
 
-module.exports = router;
+// View all orders: Admin and Staff
+router.get(
+    '/',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.getAll
+);
+
+// View one order: Admin and Staff
+router.get(
+    '/:id',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.getById
+);
+
+// Create an order: Admin and Staff
+router.post(
+    '/',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.create
+);
+
+// Update order status: Admin and Staff
+router.patch(
+    '/:id/status',
+    authenticateToken,
+    authorizeRoles('admin', 'staff'),
+    orderController.updateStatus
+);
+
+ module.exports = router;
