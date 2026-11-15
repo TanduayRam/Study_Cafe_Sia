@@ -1,169 +1,132 @@
-
 const db = require('../config/databases');
-const logAction = require('../utils/audit_logger');
+const alertModel = require('./alerts_model');
 
-const SYSTEM_USER_ID = 7;
+// The rules agreed by the group:
+const OVERSTAY_MINUTES = 10;        // a session is "overstaying" 10 minutes after its end time...
+const OVERSTAY_ZONE_PERCENT = 80;   // ...but only if its zone is at least 80% full
+const CAPACITY_PERCENT = 90;        // a zone at 90% full gets a Capacity alert
 
-async function createAlert(connection, alertType, message) {
-    const [existing] = await connection.query(
-        `SELECT alert_id
-         FROM alerts
-         WHERE alert_type = ?
-         AND message = ?
-         AND status = 'Open'
-         LIMIT 1
-         FOR UPDATE`,
-        [alertType, message]
+// For every zone: how many seats are Occupied compared to its capacity.
+async function getZoneOccupancy(connection) {
+    const [zones] = await connection.query(
+        `SELECT z.zone_id, z.name, z.capacity,
+                COUNT(CASE WHEN s.status = 'Occupied' THEN 1 END) AS occupied
+         FROM study_zones z
+         LEFT JOIN seats s ON s.zone_id = z.zone_id
+         GROUP BY z.zone_id, z.name, z.capacity`
     );
 
-    if (existing.length > 0) {
-        return null;
+    for (let i = 0; i < zones.length; i++) {
+        zones[i].percent = 0;
+        if (zones[i].capacity > 0) {
+            zones[i].percent = (zones[i].occupied / zones[i].capacity) * 100;
+        }
     }
-
-    const [result] = await connection.query(
-        `INSERT INTO alerts
-         (user_id, message, alert_type, status)
-         VALUES (?, ?, ?, 'Open')`,
-        [SYSTEM_USER_ID, message, alertType]
-    );
-
-    await logAction({
-        userId: SYSTEM_USER_ID,
-        action: 'CREATE',
-        tableName: 'alerts',
-        recordId: result.insertId,
-        description: `System automatically created a ${alertType} alert: ${message}`
-    }, connection);
-
-    return result.insertId;
+    return zones;
 }
 
-exports.checkSessions = async () => {
+// Finds one zone in the list by its id.
+function findZone(zones, zoneId) {
+    for (let i = 0; i < zones.length; i++) {
+        if (zones[i].zone_id === zoneId) {
+            return zones[i];
+        }
+    }
+    return null;
+}
+
+// Runs all three checks (capacity, overstay, low stock) in ONE transaction.
+// New alerts are created by the System (user id empty).
+async function checkSessions(now) {
+    if (!now) now = new Date();
+
     const connection = await db.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        let capacityAlerts = 0;
-        let stockAlerts = 0;
-        let overstayAlerts = 0;
+        const result = { capacity: 0, overstay: 0, low_stock: 0, created_alert_ids: [] };
+        const zones = await getZoneOccupancy(connection);
 
-        const [zones] = await connection.query(
-            `SELECT
-                z.study_zone_id,
-                z.name,
-                z.capacity,
-                COUNT(
-                    CASE WHEN s.status = 'Occupied'
-                    THEN 1 END
-                ) AS occupied_seats
-             FROM study_zones z
-             LEFT JOIN seats s
-                ON z.study_zone_id = s.study_zone_id
-             GROUP BY
-                z.study_zone_id,
-                z.name,
-                z.capacity`
-        );
+        // 1. Capacity alert: a zone is 90% full or more.
+        for (let i = 0; i < zones.length; i++) {
+            const zone = zones[i];
 
-        for (const zone of zones) {
-            const occupancy = Number(zone.occupied_seats);
-            const capacity = Number(zone.capacity);
+            if (zone.percent >= CAPACITY_PERCENT) {
+                const alertId = await alertModel.createIfNew(connection, {
+                    alert_type: 'Capacity',
+                    zone_id: zone.zone_id,
+                    message: zone.name + ' is ' + Math.round(zone.percent) + '% full (' + zone.occupied + '/' + zone.capacity + ' seats).'
+                }, null);
 
-            if (capacity > 0 && occupancy / capacity >= 0.90) {
-                const message =
-                    `${zone.name} has reached ${Math.round(
-                        (occupancy / capacity) * 100
-                    )}% capacity (${occupancy}/${capacity} seats).`;
-
-                const alertId = await createAlert(
-                    connection,
-                    'Capacity',
-                    message
-                );
-
-                if (alertId) capacityAlerts++;
+                if (alertId) {
+                    result.capacity = result.capacity + 1;
+                    result.created_alert_ids.push(alertId);
+                }
             }
         }
 
-        const [overstayingSessions] = await connection.query(
-            `SELECT
-                sl.session_log_id,
-                sl.user_id,
-                sl.study_zone_id,
-                sl.expected_end_time,
-                z.name AS zone_name,
-                z.capacity,
-                COUNT(
-                    CASE WHEN s.status = 'Occupied'
-                    THEN 1 END
-                ) AS occupied_seats
+        // 2. Overstay alert: an Active session is 10+ minutes past its end time AND its zone is 80%+ full.
+        const [sessions] = await connection.query(
+            `SELECT sl.session_log_id, sl.zone_id, sl.seat_id, sl.expected_end_time, s.label AS seat_label
              FROM session_logs sl
-             JOIN study_zones z
-                ON sl.study_zone_id = z.study_zone_id
-             LEFT JOIN seats s
-                ON z.study_zone_id = s.study_zone_id
+             LEFT JOIN seats s ON sl.seat_id = s.seat_id
              WHERE sl.status = 'Active'
                AND sl.expected_end_time IS NOT NULL
-               AND sl.expected_end_time <= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
-             GROUP BY
-                sl.session_log_id,
-                sl.user_id,
-                sl.study_zone_id,
-                sl.expected_end_time,
-                z.name,
-                z.capacity
-             HAVING z.capacity > 0
-                AND occupied_seats / z.capacity >= 0.80`
+               AND sl.expected_end_time <= DATE_SUB(?, INTERVAL ${OVERSTAY_MINUTES} MINUTE)`,
+            [now]
         );
 
-        for (const session of overstayingSessions) {
-            const message =
-                `Session ${session.session_log_id} is overstaying in ${session.zone_name}. Expected end time passed by at least 10 minutes.`;
+        for (let i = 0; i < sessions.length; i++) {
+            const session = sessions[i];
+            const zone = findZone(zones, session.zone_id);
 
-            const alertId = await createAlert(
-                connection,
-                'Overstay',
-                message
-            );
+            if (zone && zone.percent >= OVERSTAY_ZONE_PERCENT) {
+                let seatName = 'A seat';
+                if (session.seat_label) seatName = session.seat_label;
 
-            if (alertId) overstayAlerts++;
+                const alertId = await alertModel.createIfNew(connection, {
+                    alert_type: 'Overstay',
+                    zone_id: session.zone_id,
+                    seat_id: session.seat_id,
+                    message: seatName + ' in ' + zone.name + ' is past its end time by ' + OVERSTAY_MINUTES + '+ minutes while the zone is ' + Math.round(zone.percent) + '% full.'
+                }, null);
+
+                if (alertId) {
+                    result.overstay = result.overstay + 1;
+                    result.created_alert_ids.push(alertId);
+                }
+            }
         }
 
+        // 3. Low stock alert: stock is at or below the reorder level.
         const [items] = await connection.query(
-            `SELECT menu_item_id, name, stock, reorder_level
-             FROM menu_items
-             WHERE stock <= reorder_level`
+            'SELECT item_id, name, stock, reorder_level FROM menu_items WHERE stock <= reorder_level'
         );
 
-        for (const item of items) {
-            const message =
-                `${item.name} is low in stock. Current stock: ${item.stock}. Reorder level: ${item.reorder_level}.`;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
 
-            const alertId = await createAlert(
-                connection,
-                'Low Stock',
-                message
-            );
+            const alertId = await alertModel.createIfNew(connection, {
+                alert_type: 'LowStock',
+                item_id: item.item_id,
+                message: item.name + ' is low: ' + item.stock + ' left (reorder level ' + item.reorder_level + ').'
+            }, null);
 
-            if (alertId) stockAlerts++;
+            if (alertId) {
+                result.low_stock = result.low_stock + 1;
+                result.created_alert_ids.push(alertId);
+            }
         }
 
         await connection.commit();
-
-        return {
-            success: true,
-            capacityAlerts,
-            overstayAlerts,
-            stockAlerts,
-            message: 'Monitoring checks completed.'
-        };
-
+        return result;
     } catch (error) {
         await connection.rollback();
         throw error;
-
     } finally {
         connection.release();
     }
-};
+}
+
+module.exports = { checkSessions: checkSessions };

@@ -1,15 +1,11 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const payment = require('../controllers/payment_controller');
+const { authenticateToken, isAdmin, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const PaymentController = require('../controllers/payment_controller');
+router.use(authenticateToken, isAdminOrStaff);
 
-// Get all payments
-router.get('/', PaymentController.getAll);
-
-// Get one payment
-router.get('/:id', PaymentController.getById);
-
-// Void a payment
-router.put('/:id/void', PaymentController.voidPayment);
+router.get('/', payment.getAll);
+router.get('/:id', payment.getById);
+router.put('/:id/void', isAdmin, payment.voidPayment);
 
 module.exports = router;

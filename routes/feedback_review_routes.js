@@ -1,17 +1,14 @@
-const express = require('express');
+const router = require('express').Router();
+const review = require('../controllers/feedback_review_controller');
+const { authenticateToken } = require('../middleware/auth_middleware');
 
-const router = express.Router();
+// Any logged-in user. The "who owns it" rules are checked in the controller.
+router.use(authenticateToken);
 
-const reviewController = require('../controllers/feedback_review_controller');
-
-router.post('/', reviewController.createReview);
-
-router.get('/', reviewController.getReviews);
-
-router.get('/:id', reviewController.getReview);
-
-router.put('/:id', reviewController.updateReview);
-
-router.delete('/:id', reviewController.deleteReview);
+router.get('/', review.getAll);
+router.get('/:id', review.getById);
+router.post('/', review.create);
+router.put('/:id', review.update);
+router.delete('/:id', review.remove);
 
 module.exports = router;

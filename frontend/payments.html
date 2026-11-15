@@ -1,683 +1,153 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Café | Payments</title>
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        body {
-            background: #f7f3ec;
-            color: #302219;
-        }
-
-        .sidebar {
-            width: 255px;
-            background: #302219;
-            color: #fffaf1;
-            padding: 30px 18px;
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        .brand {
-            font-size: 23px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-
-        .brand-subtitle {
-            text-align: center;
-            font-size: 12px;
-            color: #c9b8a4;
-            margin-bottom: 40px;
-        }
-
-        .nav-title {
-            font-size: 11px;
-            color: #b9a590;
-            margin: 15px 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .nav-links {
-            list-style: none;
-        }
-
-        .nav-links li {
-            margin-bottom: 8px;
-        }
-
-        .nav-links a {
-            display: block;
-            padding: 13px 15px;
-            color: #e9dfd2;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: background 0.2s ease, color 0.2s ease;
-            font-size: 14px;
-        }
-
-        .nav-links a:hover,
-        .nav-links a.active {
-            background: #594332;
-            color: #ffffff;
-        }
-
-        .nav-icon {
-            display: inline-block;
-            width: 25px;
-        }
-
-        .sidebar-bottom {
-            margin-top: auto;
-            border-top: 1px solid #514033;
-            padding-top: 20px;
-            padding-bottom: 10px;
-            flex-shrink: 0;
-        }
-
-        .main-content {
-            margin-left: 255px;
-            padding: 35px 45px;
-        }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 35px;
-        }
-
-        .topbar h1 {
-            font-size: 28px;
-            color: #302219;
-        }
-
-        .topbar p {
-            color: #897b6b;
-            margin-top: 5px;
-            font-size: 14px;
-        }
-
-        .admin-label {
-            background: #e9dfd2;
-            color: #594332;
-            padding: 10px 18px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .welcome {
-            margin-bottom: 25px;
-        }
-
-        .welcome h2 {
-            font-size: 23px;
-            margin-bottom: 7px;
-        }
-
-        .welcome p {
-            color: #897b6b;
-            font-size: 14px;
-        }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .summary-card {
-            background: #ffffff;
-            border-radius: 13px;
-            padding: 25px;
-            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .summary-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 7px 18px rgba(48, 34, 25, 0.09);
-        }
-
-        .summary-card p {
-            color: #897b6b;
-            font-size: 13px;
-            margin-bottom: 12px;
-        }
-
-        .summary-card h2 {
-            font-size: 29px;
-            color: #594332;
-        }
-
-        .content-card {
-            background: #ffffff;
-            border-radius: 13px;
-            padding: 28px;
-            margin-bottom: 28px;
-            box-shadow: 0 3px 12px rgba(48, 34, 25, 0.05);
-            transition: box-shadow 0.25s ease;
-        }
-
-        .content-card:hover {
-            box-shadow: 0 6px 18px rgba(48, 34, 25, 0.07);
-        }
-
-        .card-heading {
-            margin-bottom: 22px;
-        }
-
-        .card-heading h2 {
-            font-size: 19px;
-            margin-bottom: 6px;
-        }
-
-        .card-heading p {
-            color: #897b6b;
-            font-size: 13px;
-        }
-
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1150px;
-        }
-
-        th {
-            background: #f5f0e9;
-            color: #594332;
-            text-align: left;
-            padding: 15px 12px;
-            font-size: 12px;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        td {
-            padding: 15px 12px;
-            border-bottom: 1px solid #eee8df;
-            font-size: 13px;
-            vertical-align: middle;
-        }
-
-        tbody tr {
-            transition: background 0.2s ease;
-        }
-
-        tbody tr:hover {
-            background: #fdf8f1;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 6px 11px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .paid {
-            background: #e0f0e3;
-            color: #357447;
-        }
-
-        .voided {
-            background: #f6dddd;
-            color: #a33d3d;
-        }
-
-        .other-status {
-            background: #f5ead6;
-            color: #89652e;
-        }
-
-        .void-btn {
-            background: #f6dddd;
-            color: #a33d3d;
-            padding: 8px 14px;
-            transition: background 0.2s ease, transform 0.2s ease,
-                box-shadow 0.2s ease;
-        }
-
-        .void-btn:hover {
-            background: #efc6c6;
-            transform: translateY(-2px);
-            box-shadow: 0 3px 8px rgba(163, 61, 61, 0.12);
-        }
-
-        .void-btn:active {
-            transform: translateY(0);
-        }
-
-        .void-btn:focus-visible {
-            outline: 3px solid rgba(163, 61, 61, 0.25);
-            outline-offset: 2px;
-        }
-
-        .no-action {
-            color: #a69a8c;
-            font-size: 12px;
-        }
-
-        #status {
-            color: #897b6b;
-            font-size: 13px;
-            margin-top: 15px;
-        }
-
-        @keyframes contentFadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(14px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes rowFadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .welcome,
-        .summary-grid,
-        .content-card {
-            animation: contentFadeUp 0.4s ease both;
-        }
-
-        .welcome {
-            animation-delay: 0.05s;
-        }
-
-        .summary-grid {
-            animation-delay: 0.12s;
-        }
-
-        .content-card {
-            animation-delay: 0.2s;
-        }
-
-        tbody tr {
-            animation: rowFadeIn 0.3s ease both;
-        }
-
-        tbody tr:nth-child(1) {
-            animation-delay: 0.03s;
-        }
-
-        tbody tr:nth-child(2) {
-            animation-delay: 0.06s;
-        }
-
-        tbody tr:nth-child(3) {
-            animation-delay: 0.09s;
-        }
-
-        tbody tr:nth-child(4) {
-            animation-delay: 0.12s;
-        }
-
-        tbody tr:nth-child(5) {
-            animation-delay: 0.15s;
-        }
-
-        tbody tr:nth-child(n+6) {
-            animation-delay: 0.18s;
-        }
-
-        @media (max-width: 1000px) {
-            .main-content {
-                padding: 25px;
-            }
-
-            .summary-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 650px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-                padding: 20px;
-            }
-
-            .brand-subtitle {
-                margin-bottom: 15px;
-            }
-
-            .nav-title {
-                display: none;
-            }
-
-            .nav-links {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-            }
-
-            .nav-links li {
-                margin: 0;
-            }
-
-            .sidebar-bottom {
-                margin-top: 15px;
-            }
-
-            .main-content {
-                margin-left: 0;
-                padding: 20px;
-            }
-
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .summary-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .content-card {
-                padding: 20px;
-            }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                scroll-behavior: auto !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-    </style>
-</head>
-
-<body>
-
-    <aside class="sidebar">
-
-        <div class="brand">☕ Study Café</div>
-        <div class="brand-subtitle">Reservation & Management System</div>
-
-        <div class="nav-title">Main Menu</div>
-
-        <ul class="nav-links">
-            <li><a href="user.html"><span class="nav-icon">▦</span>Dashboard</a></li>
-            <li><a href="zones.html"><span class="nav-icon">▤</span>Study Zones</a></li>
-            <li><a href="seats.html"><span class="nav-icon">▣</span>Seats</a></li>
-            <li><a href="menu.html"><span class="nav-icon">☕</span>Menu Management</a></li>
-            <li><a href="pass_packages.html"><span class="nav-icon">▧</span>Pass Packages</a></li>
-            <li><a href="payments.html" class="active"><span class="nav-icon">₱</span>Payments</a></li>
-            <li><a href="member_passes_report.html"><span class="nav-icon">📊</span>Member Passes Report</a></li>
-        </ul>
-
-        <div class="sidebar-bottom">
-            <ul class="nav-links">
-                <li>
-                    <a href="login.html"
-                       title="Logout"
-                       onclick="localStorage.removeItem('user')">
-                        <span class="nav-icon">⇥</span>
-                        Logout
-                    </a>
-                </li>
-            </ul>
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Study Cafe - Payments & Billing</title>
+ <link rel="stylesheet" href="app.css">
+ </head>
+ <body>
+ git<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Payments & Billing</h1>
+            <div class="who" id="who"></div>
         </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2>Billing tools</h2>
+    <div class="row">
+        <div><label>Compute a bill (reservation ID)</label><input type="number" id="billReservationId" min="1"></div>
+        <div><label>Pretend check-out time (optional)</label><input type="datetime-local" id="billTime"></div>
+        <div><button class="btn" onclick="computeBill()">Compute bill</button></div>
+    </div>
+    <pre class="bill" id="billOutput" style="display:none"></pre>
 
-    </aside>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
 
-    <main class="main-content">
+    <div class="row">
+        <div><label>Release no-shows - pretend "now" (optional, for the demo)</label><input type="datetime-local" id="noShowTime"></div>
+        <div><button class="btn primary" onclick="releaseNoShows()">Release no-shows</button></div>
+    </div>
+    <p class="hint">A Confirmed reservation not checked in 15 minutes after its start becomes NoShow and its seat is released.</p>
+</div>
 
-        <header class="topbar">
-            <div>
-                <h1>Payments</h1>
-                <p>Monitor payment transactions and records.</p>
-            </div>
+<div class="card">
+    <h2>Payments</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Reservation</th><th>Member</th><th>Pass hours</th><th>Pass part</th><th>Cash part</th><th>Total</th><th>Method</th><th>Status</th><th>Paid at</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
 
-            <div class="admin-label">Administrator</div>
-        </header>
+<script src="api.js"></script>
+<script>
+var isAdmin = false;
 
-        <section class="welcome">
-            <h2>Payment Records ☕</h2>
-            <p>View payment details, monitor transaction statuses, and manage voided payments.</p>
-        </section>
+async function loadPayments() {
+    try {
+        showLoading();
+        var result = await callApi('/payments');
 
-        <section class="summary-grid">
+        var html = '';
+        for (var i = 0; i < result.data.length; i++) {
+            var p = result.data[i];
 
-            <div class="summary-card">
-                <p>Total Payment Records</p>
-                <h2 id="paymentCount">0</h2>
-            </div>
-
-            <div class="summary-card">
-                <p>Paid Transactions</p>
-                <h2 id="paidCount">0</h2>
-            </div>
-
-            <div class="summary-card">
-                <p>Total Collected</p>
-                <h2 id="totalCollected">₱0.00</h2>
-            </div>
-
-        </section>
-
-        <section class="content-card">
-
-            <div class="card-heading">
-                <h2>All Payment Transactions</h2>
-                <p>Review payment amounts, methods, statuses, and transaction details.</p>
-            </div>
-
-            <div class="table-wrapper">
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Payment ID</th>
-                            <th>Reservation ID</th>
-                            <th>Pass Amount</th>
-                            <th>Cash Amount</th>
-                            <th>Total Amount</th>
-                            <th>Payment Method</th>
-                            <th>Status</th>
-                            <th>Paid At</th>
-                            <th>Void Reason</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-
-                    <tbody id="paymentList"></tbody>
-                </table>
-
-            </div>
-
-            <p id="status">Payment records are ready to view!</p>
-
-        </section>
-
-    </main>
-
-    <script>
-
-        async function loadPayments() {
-
-            const status = document.getElementById('status');
-            const list = document.getElementById('paymentList');
-
-            status.textContent = 'Loading payment records...';
-
-            try {
-
-                const res = await fetch('/api/payments');
-
-                if (!res.ok) {
-                    throw new Error('Failed to retrieve payment records.');
-                }
-
-                const response = await res.json();
-
-                const payments = response.data.sort((a, b) =>
-                    Number(a.payment_id) - Number(b.payment_id)
-                );
-
-                const paidPayments = payments.filter(payment =>
-                    payment.status === 'Paid'
-                );
-
-                const totalCollected = paidPayments.reduce((total, payment) =>
-                    total + Number(payment.total_amount || 0), 0
-                );
-
-                document.getElementById('paymentCount').textContent =
-                    payments.length;
-
-                document.getElementById('paidCount').textContent =
-                    paidPayments.length;
-
-                document.getElementById('totalCollected').textContent =
-                    '₱' + totalCollected.toFixed(2);
-
-                list.innerHTML = payments.map(payment => {
-
-                    let statusClass = 'other-status';
-
-                    if (payment.status === 'Paid') {
-                        statusClass = 'paid';
-                    } else if (payment.status === 'Voided') {
-                        statusClass = 'voided';
-                    }
-
-                    return `
-                        <tr>
-                            <td>${payment.payment_id}</td>
-                            <td>${payment.reservation_id}</td>
-                            <td>₱${Number(payment.pass_amount || 0).toFixed(2)}</td>
-                            <td>₱${Number(payment.cash_amount || 0).toFixed(2)}</td>
-                            <td>₱${Number(payment.total_amount || 0).toFixed(2)}</td>
-                            <td>${payment.payment_method || ''}</td>
-
-                            <td>
-                                <span class="status-badge ${statusClass}">
-                                    ${payment.status}
-                                </span>
-                            </td>
-
-                            <td>${payment.paid_at || ''}</td>
-                            <td>${payment.void_reason || ''}</td>
-
-                            <td>
-                                ${payment.status === 'Paid'
-                                    ? `<button class="void-btn"
-                                        onclick="voidPayment(${payment.payment_id})">
-                                        Void
-                                    </button>`
-                                    : '<span class="no-action">No action</span>'
-                                }
-                            </td>
-                        </tr>
-                    `;
-
-                }).join('');
-
-                status.textContent =
-                    'Payment records are ready to manage!';
-
-            } catch (error) {
-
-                status.textContent = error.message;
-
+            var statusText = badge(p.status);
+            if (p.void_reason) {
+                statusText = statusText + '<div class="hint">' + escapeHtml(p.void_reason) + '</div>';
             }
+
+            var button = '';
+            if (isAdmin && p.status === 'Paid') {
+                button = '<button class="btn small danger" onclick="voidPayment(' + p.payment_id + ')">Void</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + p.payment_id + '</td>' +
+                '<td>' + p.reservation_id + '</td>' +
+                '<td>' + escapeHtml(p.member_name) + '</td>' +
+                '<td>' + formatNumber(p.pass_hours_used) + '</td>' +
+                '<td>' + formatMoney(p.pass_amount) + '</td>' +
+                '<td>' + formatMoney(p.cash_amount) + '</td>' +
+                '<td>' + formatMoney(p.total_amount) + '</td>' +
+                '<td>' + escapeHtml(p.payment_method) + '</td>' +
+                '<td>' + statusText + '</td>' +
+                '<td>' + formatDate(p.paid_at) + '</td>' +
+                '<td class="actions">' + button + '</td></tr>';
+        }
+        if (result.data.length === 0) {
+            html = '<tr><td colspan="11" class="empty">No payments yet.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// Shows the bill of any reservation (nothing is saved).
+async function computeBill() {
+    try {
+        var path = '/billing/compute/' + document.getElementById('billReservationId').value;
+        var time = document.getElementById('billTime').value;
+        if (time) {
+            path = path + '?checkout_time=' + encodeURIComponent(inputToIso(time));
         }
 
-        async function voidPayment(id) {
+        var result = await callApi(path);
+        var output = document.getElementById('billOutput');
+        output.textContent = billText(result.data);
+        output.style.display = 'block';
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
 
-            const reason = prompt('Enter the reason for voiding this payment:');
-
-            if (reason === null) {
-                return;
-            }
-
-            if (!reason.trim()) {
-                alert('A void reason is required.');
-                return;
-            }
-
-            if (!confirm('Are you sure you want to void this payment?')) {
-                return;
-            }
-
-            try {
-
-                const res = await fetch('/api/payments/' + id + '/void', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        reason: reason.trim()
-                    })
-                });
-
-                const response = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(response.message || 'Failed to void payment.');
-                }
-
-                alert('Payment voided successfully!');
-
-                loadPayments();
-
-            } catch (error) {
-
-                alert(error.message);
-
-            }
+// POST /billing/release-no-shows
+async function releaseNoShows() {
+    try {
+        var body = {};
+        var time = document.getElementById('noShowTime').value;
+        if (time) {
+            body.now = inputToIso(time);
         }
 
+        var result = await callApi('/billing/release-no-shows', 'POST', body);
+        showMessage(result.message, false);
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// PUT /payments/:id/void   (Admin only)
+async function voidPayment(id) {
+    var reason = prompt('Reason for voiding this payment:');
+    if (!reason) {
+        return;
+    }
+    try {
+        var result = await callApi('/payments/' + id + '/void', 'PUT', { reason: reason });
+        showMessage(result.message, false);
         loadPayments();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
 
-    </script>
-
+// ---- start the page ----
+var currentUser = startPage('payments.html');
+if (currentUser) {
+    isAdmin = (currentUser.role === 'Admin');
+    loadPayments();
+}
+</script>
 </body>
 </html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Alerts & Engine</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Alerts & Engine</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <h2>Monitoring engine</h2>
+    <p class="hint">Checks overstay (10+ minutes late while the zone is 80%+ full), zone capacity (90%+) and low stock. A duplicate open alert is never created.</p>
+    <div class="row">
+        <div><label>Pretend "now" (optional, for the demo)</label><input type="datetime-local" id="engineTime"></div>
+        <div><button class="btn primary" onclick="runEngine()">Run checks now</button></div>
+    </div>
+</div>
+
+<div class="card" id="newAlertBox" style="display:none">
+    <h2>New alert</h2>
+    <div class="row">
+        <div><label>Type</label>
+            <select id="newType"><option>Overstay</option><option>Capacity</option><option>LowStock</option></select>
+        </div>
+        <div><label>Study zone (optional)</label><select id="newZone"></select></div>
+        <div style="flex:2"><label>Message</label><input id="newMessage" maxlength="255"></div>
+    </div>
+    <div style="margin-top:12px">
+        <button class="btn" onclick="hideNewAlert()">Cancel</button>
+        <button class="btn primary" onclick="createAlert()">Create</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="toolbar">
+        <h2>Alerts</h2>
+        <div class="row">
+            <select id="statusFilter" onchange="loadAlerts()" style="width:auto">
+                <option value="">All statuses</option><option>Open</option><option>Acknowledged</option><option>Resolved</option>
+            </select>
+            <select id="typeFilter" onchange="loadAlerts()" style="width:auto">
+                <option value="">All types</option><option>Overstay</option><option>Capacity</option><option>LowStock</option>
+            </select>
+            <button class="btn" onclick="showNewAlert()">+ New alert</button>
+        </div>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Type</th><th>Where</th><th>Message</th><th>Status</th><th>By</th><th>Created</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var alertList = [];
+var isAdmin = false;
+
+async function loadAlerts() {
+    try {
+        showLoading();
+
+        // Build the address with the filters, like /alerts?status=Open&type=Capacity
+        var parts = [];
+        var status = document.getElementById('statusFilter').value;
+        var type = document.getElementById('typeFilter').value;
+        if (status) parts.push('status=' + encodeURIComponent(status));
+        if (type) parts.push('type=' + encodeURIComponent(type));
+
+        var path = '/alerts';
+        if (parts.length > 0) {
+            path = path + '?' + parts.join('&');
+        }
+
+        var result = await callApi(path);
+        alertList = result.data;
+
+        var html = '';
+        for (var i = 0; i < alertList.length; i++) {
+            var a = alertList[i];
+
+            // Where did it happen?
+            var where = '-';
+            if (a.seat_label) {
+                where = a.zone_name + ' - ' + a.seat_label;
+            } else if (a.zone_name) {
+                where = a.zone_name;
+            } else if (a.item_name) {
+                where = a.item_name;
+            }
+
+            var buttons = '';
+            if (a.status === 'Open') {
+                buttons = buttons + '<button class="btn small" onclick="acknowledgeAlert(' + a.alert_id + ')">Acknowledge</button> ';
+            }
+            if (a.status !== 'Resolved') {
+                buttons = buttons + '<button class="btn small" onclick="resolveAlert(' + a.alert_id + ')">Resolve</button> ' +
+                    '<button class="btn small" onclick="editAlert(' + a.alert_id + ')">Edit</button> ';
+            }
+            if (isAdmin && a.status === 'Resolved') {
+                buttons = buttons + '<button class="btn small danger" onclick="deleteAlert(' + a.alert_id + ')">Delete</button>';
+            }
+
+            html = html + '<tr>' +
+                '<td>' + a.alert_id + '</td>' +
+                '<td>' + badge(a.alert_type) + '</td>' +
+                '<td>' + escapeHtml(where) + '</td>' +
+                '<td>' + escapeHtml(a.message) + '</td>' +
+                '<td>' + badge(a.status) + '</td>' +
+                '<td>' + escapeHtml(a.created_by_name) + '</td>' +
+                '<td>' + formatDate(a.created_at) + '</td>' +
+                '<td class="actions">' + buttons + '</td></tr>';
+        }
+        if (alertList.length === 0) {
+            html = '<tr><td colspan="8" class="empty">No alerts found.</td></tr>';
+        }
+        document.getElementById('rows').innerHTML = html;
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// POST /engine/check
+async function runEngine() {
+    try {
+        var body = {};
+        var time = document.getElementById('engineTime').value;
+        if (time) {
+            body.now = inputToIso(time);
+        }
+        var result = await callApi('/engine/check', 'POST', body);
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- The "New alert" box ----
+
+async function showNewAlert() {
+    try {
+        var zones = await callApi('/study-zones');
+        var html = '<option value="">None</option>';
+        for (var i = 0; i < zones.data.length; i++) {
+            html = html + '<option value="' + zones.data[i].zone_id + '">' + escapeHtml(zones.data[i].name) + '</option>';
+        }
+        document.getElementById('newZone').innerHTML = html;
+        document.getElementById('newAlertBox').style.display = 'block';
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+function hideNewAlert() {
+    document.getElementById('newAlertBox').style.display = 'none';
+}
+
+async function createAlert() {
+    try {
+        var body = {
+            alert_type: document.getElementById('newType').value,
+            message: document.getElementById('newMessage').value
+        };
+        var zone = document.getElementById('newZone').value;
+        if (zone) {
+            body.zone_id = zone;
+        }
+
+        var result = await callApi('/alerts', 'POST', body);
+        hideNewAlert();
+        document.getElementById('newMessage').value = '';
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- Buttons in the table ----
+
+async function acknowledgeAlert(id) {
+    try {
+        var result = await callApi('/alerts/' + id + '/acknowledge', 'PATCH');
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function resolveAlert(id) {
+    try {
+        var result = await callApi('/alerts/' + id, 'PATCH', { status: 'Resolved' });
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function editAlert(id) {
+    var a = findById(alertList, 'alert_id', id);
+    var message = prompt('Edit message:', a.message);
+    if (!message) {
+        return;
+    }
+    try {
+        var result = await callApi('/alerts/' + id, 'PUT', { message: message, alert_type: a.alert_type });
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function deleteAlert(id) {
+    if (confirm('Delete this resolved alert?') === false) {
+        return;
+    }
+    try {
+        var result = await callApi('/alerts/' + id, 'DELETE');
+        showMessage(result.message, false);
+        loadAlerts();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('alerts.html');
+if (currentUser) {
+    isAdmin = (currentUser.role === 'Admin');
+    loadAlerts();
+}
+</script>
+</body>
+</html>

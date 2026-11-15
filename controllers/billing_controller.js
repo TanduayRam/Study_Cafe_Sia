@@ -1,72 +1,44 @@
 const billingModel = require('../models/billing_model');
+const noShowModel = require('../models/no_show_model');
+const { sendSuccess, toId, toDate } = require('../utils/http');
 
-async function computeBill(req, res) {
-try {
-const reservationId = Number(req.params.reservationId);
+// GET /billing/compute/:reservationId?checkout_time=...
+// Shows the bill. It does not save anything.
+exports.computeBill = async function (req, res, next) {
+    try {
+        const reservationId = toId(req.params.reservationId, 'Reservation ID');
 
+        let at = new Date();
+        if (req.query.checkout_time) {
+            at = toDate(req.query.checkout_time, 'Checkout time');
+        }
 
-    if (!Number.isInteger(reservationId) || reservationId <= 0) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid reservation ID.'
-        });
+        const bill = await billingModel.computeBill(reservationId, at);
+        return sendSuccess(res, bill, 'Bill calculated.');
+    } catch (error) {
+        next(error);
     }
+};
 
-    // Convert checkout time into a JavaScript Date object
-    const checkoutTime = req.query.checkout_time
-        ? new Date(String(req.query.checkout_time).trim())
-        : new Date();
+// POST /billing/release-no-shows   with optional { "now": "pretend time" }
+exports.releaseNoShows = async function (req, res, next) {
+    try {
+        const body = req.body || {};
 
-    console.log('Received checkout time:', req.query.checkout_time);
-    console.log('Parsed checkout time:', checkoutTime);
+        let now = new Date();
+        if (body.now) {
+            now = toDate(body.now, 'Simulated time');
+        }
 
-    if (isNaN(checkoutTime.getTime())) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid checkout time.'
-        });
+        const released = await noShowModel.releaseNoShows(now);
+
+        let message = 'No reservations needed to be released.';
+        if (released.length > 0) {
+            message = released.length + ' reservation(s) marked as No-Show and released.';
+        }
+
+        return sendSuccess(res, { released_count: released.length, released: released }, message);
+    } catch (error) {
+        next(error);
     }
-
-    const bill = await billingModel.computeBill(
-        reservationId,
-        checkoutTime
-    );
-
-    return res.status(200).json({
-        success: true,
-        message: 'Bill calculated successfully.',
-        data: bill
-    });
-
-} catch (error) {
-    console.error('Billing error:', error);
-
-    if (error.message === 'Reservation not found.') {
-        return res.status(404).json({
-            success: false,
-            message: error.message
-        });
-    }
-
-    if (
-        error.message === 'Invalid reservation ID.' ||
-        error.message === 'Invalid checkout time.' ||
-        error.message === 'Invalid reservation time.' ||
-        error.message === 'Invalid study zone hourly rate.'
-    ) {
-        return res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
-
-    return res.status(500).json({
-        success: false,
-        message: 'Failed to calculate the bill.'
-    });
-}
-
-
-}
-
-module.exports = { computeBill };
+};

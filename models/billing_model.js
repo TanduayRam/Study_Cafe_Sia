@@ -1,269 +1,178 @@
 const db = require('../config/databases');
+const { createError, roundMoney } = require('../utils/http');
 
-// Round monetary amounts to two decimal places
-function roundMoney(amount) {
-    return Math.round((amount + Number.EPSILON) * 100) / 100;
+const HOUR_MS = 3600000;          // milliseconds in one hour
+const DAY_MS = 24 * HOUR_MS;      // milliseconds in one day
+
+// The cafe is in the Philippines (UTC+8). Needed to know when 4 PM - 8 PM is.
+let OFFSET_HOURS = 8;
+if (process.env.CAFE_UTC_OFFSET_HOURS !== undefined) {
+    OFFSET_HOURS = Number(process.env.CAFE_UTC_OFFSET_HOURS);
 }
 
-// Round hours to two decimal places
+const PEAK_START_HOUR = 16;       // 4 PM
+const PEAK_END_HOUR = 20;         // 8 PM
+const PEAK_SURCHARGE_RATE = 0.10; // 10 percent
+const OVERTIME_BLOCK_MINUTES = 30;
+
+// Rounds hours to 2 decimal places.
 function roundHours(hours) {
     return Math.round((hours + Number.EPSILON) * 100) / 100;
 }
 
-// Calculate the bill for a reservation
-async function computeBill(
-    reservationId,
-    checkoutTime = new Date(),
-    connection = db
-) {
-    // Validate reservation ID
-    if (!Number.isInteger(Number(reservationId)) || Number(reservationId) <= 0) {
-        throw new Error('Invalid reservation ID.');
+// How many hours of the booking (start to end) fall between 4 PM and 8 PM cafe time?
+function peakHoursBetween(start, end) {
+    // Move the times to cafe time so "4 PM" means 4 PM in the cafe.
+    const startMs = start.getTime() + OFFSET_HOURS * HOUR_MS;
+    const endMs = end.getTime() + OFFSET_HOURS * HOUR_MS;
+
+    let peakMs = 0;
+
+    // Go through each day the booking touches (usually just one).
+    let dayStart = Math.floor(startMs / DAY_MS) * DAY_MS;
+
+    while (dayStart < endMs) {
+        const peakStart = dayStart + PEAK_START_HOUR * HOUR_MS;
+        const peakEnd = dayStart + PEAK_END_HOUR * HOUR_MS;
+
+        // The overlap of the booking and the peak window.
+        const overlapStart = Math.max(startMs, peakStart);
+        const overlapEnd = Math.min(endMs, peakEnd);
+
+        if (overlapEnd > overlapStart) {
+            peakMs = peakMs + (overlapEnd - overlapStart);
+        }
+
+        dayStart = dayStart + DAY_MS;
     }
 
-    // Validate checkout time
-    const actualCheckoutTime = new Date(checkoutTime);
+    return peakMs / HOUR_MS;
+}
 
-    if (isNaN(actualCheckoutTime.getTime())) {
-        throw new Error('Invalid checkout time.');
-    }
+// computeBill(reservationId, checkoutTime, connection)
+// Works out how much a reservation costs. It only READS the database, it never changes it.
+// Check-out calls it inside its transaction and then saves the result.
+async function computeBill(reservationId, checkoutTime, connection) {
+    if (!checkoutTime) checkoutTime = new Date();
+    if (!connection) connection = db;
 
-    // Get reservation and study zone details
-    const [reservations] = await connection.query(
-        `SELECT
-            r.reservation_id,
-            r.user_id,
-            r.start_time,
-            r.end_time,
-            sz.name AS zone_name,
-            sz.type AS zone_type,
-            sz.hourly_rate
+    // 1. Get the reservation with its zone (we need the rate and zone type).
+    const [rows] = await connection.query(
+        `SELECT r.reservation_id, r.user_id, r.status, r.start_time, r.end_time,
+                z.name AS zone_name, z.type AS zone_type, z.hourly_rate
          FROM reservations r
-         INNER JOIN seats s
-            ON r.seat_id = s.seat_id
-         INNER JOIN study_zones sz
-            ON s.study_zone_id = sz.study_zone_id
+         INNER JOIN seats s ON r.seat_id = s.seat_id
+         INNER JOIN study_zones z ON s.zone_id = z.zone_id
          WHERE r.reservation_id = ?`,
         [reservationId]
     );
 
-    if (reservations.length === 0) {
-        throw new Error('Reservation not found.');
+    if (rows.length === 0) {
+        throw createError(404, 'Reservation not found.');
     }
 
-    const reservation = reservations[0];
+    const reservation = rows[0];
+    const start = new Date(reservation.start_time);
+    const end = new Date(reservation.end_time);
+    const rate = Number(reservation.hourly_rate);
+    const sessionHours = roundHours((end - start) / HOUR_MS);
 
-    // Convert reservation dates
-    const startTime = new Date(reservation.start_time);
-    const endTime = new Date(reservation.end_time);
+    // RULE: passes cover study zones only. Game Station is always paid in cash.
+    const isGameStation = (reservation.zone_type === 'Game Station');
 
-    if (
-        isNaN(startTime.getTime()) ||
-        isNaN(endTime.getTime()) ||
-        endTime <= startTime
-    ) {
-        throw new Error('Invalid reservation time.');
-    }
-
-    // Calculate session duration
-    const sessionHours = roundHours(
-        (endTime.getTime() - startTime.getTime()) / 3600000
-    );
-
-    const hourlyRate = Number(reservation.hourly_rate);
-
-    if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
-        throw new Error('Invalid study zone hourly rate.');
-    }
-
-    // Check whether the reservation is for Game Station
-    const isGameStation =
-        String(reservation.zone_type).toLowerCase() === 'game station' ||
-        String(reservation.zone_name).toLowerCase() === 'game station';
-
-    // Retrieve active member passes
-    let memberPasses = [];
-
-    if (!isGameStation) {
-        const [passes] = await connection.query(
-            `SELECT
-                member_pass_id,
-                remaining_hours,
-                expires_on
+    // 2. RULE: use the member's active, not-expired pass hours first. Earliest expiry first.
+    let passes = [];
+    if (isGameStation === false) {
+        const [passRows] = await connection.query(
+            `SELECT member_pass_id, remaining_hours
              FROM member_passes
-             WHERE user_id = ?
-               AND remaining_hours > 0
-               AND expires_on >= CURDATE()
+             WHERE user_id = ? AND remaining_hours > 0 AND expires_on >= UTC_DATE()
              ORDER BY expires_on ASC, member_pass_id ASC
              FOR UPDATE`,
             [reservation.user_id]
         );
-
-        memberPasses = passes;
+        passes = passRows;
     }
 
-     // Calculate pass usage and remaining cash hours
-    let cashHours = sessionHours;
+    // Take hours from each pass until the booking is covered or the passes run out.
+    let hoursLeft = sessionHours;
     const passDeductions = [];
+    let passHoursUsed = 0;
 
-    for (const pass of memberPasses) {
-        if (cashHours <= 0) {
+    for (let i = 0; i < passes.length; i++) {
+        if (hoursLeft <= 0) {
             break;
         }
 
-        const remainingHours = Number(pass.remaining_hours);
-
-        if (!Number.isFinite(remainingHours) || remainingHours <= 0) {
-            continue;
+        let hoursToUse = Number(passes[i].remaining_hours);
+        if (hoursLeft < hoursToUse) {
+            hoursToUse = hoursLeft;
         }
+        hoursToUse = roundHours(hoursToUse);
 
-        // Round each deduction to two decimal places
-        const hoursToUse = roundHours(
-            Math.min(remainingHours, cashHours)
-        );
-
-        if (hoursToUse <= 0) {
-            continue;
+        if (hoursToUse > 0) {
+            passDeductions.push({ member_pass_id: passes[i].member_pass_id, hours_used: hoursToUse });
+            passHoursUsed = roundHours(passHoursUsed + hoursToUse);
+            hoursLeft = roundHours(hoursLeft - hoursToUse);
         }
-
-        passDeductions.push({
-            member_pass_id: pass.member_pass_id,
-            hours_used: hoursToUse
-        });
-
-        cashHours = roundHours(cashHours - hoursToUse);
     }
 
-    // Calculate total pass hours used
-    const passHoursUsed = roundHours(
-        passDeductions.reduce(
-            (total, deduction) => total + deduction.hours_used,
-            0
-        )
-    );
+    // Whatever the passes could not cover is paid in cash.
+    let cashHours = hoursLeft;
+    if (cashHours < 0) cashHours = 0;
+    cashHours = roundHours(cashHours);
 
-    // Calculate regular session amounts
-    cashHours = roundHours(Math.max(0, cashHours));
+    const passAmount = roundMoney(passHoursUsed * rate);
+    const cashSeatAmount = roundMoney(cashHours * rate);
 
-    const passAmount = roundMoney(
-        passHoursUsed * hourlyRate
-    );
+    // 3. RULE: peak hours (4 PM - 8 PM) add 10 percent of the zone rate.
+    const peakHours = roundHours(peakHoursBetween(start, end));
+    const peakSurcharge = roundMoney(peakHours * rate * PEAK_SURCHARGE_RATE);
 
-    const cashSessionAmount = roundMoney(
-        cashHours * hourlyRate
-    );
+    // 4. RULE: time past the end is overtime. Billed in cash per STARTED 30 minutes.
+    //    A pass never covers overtime.
+    const checkoutDate = new Date(checkoutTime);
+    let lateMs = checkoutDate.getTime() - end.getTime();
+    if (lateMs < 0) lateMs = 0;
+    const overtimeBlocks = Math.ceil(lateMs / (OVERTIME_BLOCK_MINUTES * 60000));
+    const overtimeAmount = roundMoney(overtimeBlocks * (rate * OVERTIME_BLOCK_MINUTES / 60));
 
-    // Get served order totals for this reservation
-    const [orders] = await connection.query(
+    // 5. Food and drinks ordered during the visit (cancelled orders do not count).
+    const [orderRows] = await connection.query(
         `SELECT COALESCE(SUM(total_amount), 0) AS orders_total
          FROM orders
-         WHERE reservation_id = ?
-           AND status = 'Served'`,
+         WHERE reservation_id = ? AND status <> 'Cancelled'`,
         [reservationId]
     );
+    const ordersTotal = roundMoney(orderRows[0].orders_total);
 
-    const ordersTotal = roundMoney(
-        Number(orders[0].orders_total)
-    );
+    // 6. Totals.
+    const cashAmount = roundMoney(cashSeatAmount + overtimeAmount + peakSurcharge + ordersTotal);
+    const totalAmount = roundMoney(passAmount + cashAmount);
 
-    if (!Number.isFinite(ordersTotal) || ordersTotal < 0) {
-        throw new Error('Invalid served order total.');
-    }
-
-    // Calculate peak-hour overlap (4 PM to 8 PM)
-    let peakHours = 0;
-
-    const currentDay = new Date(startTime);
-    currentDay.setHours(0, 0, 0, 0);
-
-    while (currentDay.getTime() <= endTime.getTime()) {
-        const peakStart = new Date(currentDay);
-        peakStart.setHours(16, 0, 0, 0);
-
-        const peakEnd = new Date(currentDay);
-        peakEnd.setHours(20, 0, 0, 0);
-
-        const overlapStart = Math.max(
-            startTime.getTime(),
-            peakStart.getTime()
-        );
-
-        const overlapEnd = Math.min(
-            endTime.getTime(),
-            peakEnd.getTime()
-        );
-
-        if (overlapEnd > overlapStart) {
-            peakHours +=
-                (overlapEnd - overlapStart) / 3600000;
-        }
-
-        currentDay.setDate(currentDay.getDate() + 1);
-    }
-
-    peakHours = roundHours(peakHours);
-
-    // Apply 10% peak-hour surcharge,
-    // even when member-pass hours are used
-    const peakSurcharge = roundMoney(
-        peakHours * hourlyRate * 0.10
-    );
-
-    // Calculate overtime
-    const overtimeMilliseconds = Math.max(
-        0,
-        actualCheckoutTime.getTime() - endTime.getTime()
-    );
-
-    // Charge for every started 30-minute period
-    const overtimePeriods = Math.ceil(
-        overtimeMilliseconds / (30 * 60 * 1000)
-    );
-
-    const billedOvertimeHours = overtimePeriods * 0.5;
-
-    const actualOvertimeHours = roundHours(
-        overtimeMilliseconds / 3600000
-    );
-
-    const overtimeAmount = roundMoney(
-        overtimePeriods * (hourlyRate / 2)
-    );
-
-    // Calculate total cash charges
-    const cashAmount = roundMoney(
-        cashSessionAmount +
-        peakSurcharge +
-        overtimeAmount +
-        ordersTotal
-    );
-
-    // Calculate final amount
-    const totalAmount = roundMoney(
-        passAmount + cashAmount
-    );
-
-    // Return billing breakdown
     return {
         reservation_id: reservation.reservation_id,
+        status: reservation.status,
         zone_name: reservation.zone_name,
+        zone_type: reservation.zone_type,
+        hourly_rate: rate,
+        pass_allowed: !isGameStation,
         session_hours: sessionHours,
         pass_hours_used: passHoursUsed,
         pass_deductions: passDeductions,
         cash_hours: cashHours,
         pass_amount: passAmount,
-        cash_session_amount: cashSessionAmount,
-        cash_amount: cashAmount,
+        cash_seat_amount: cashSeatAmount,
         peak_hours: peakHours,
         peak_surcharge: peakSurcharge,
-        overtime_hours: billedOvertimeHours,
-        actual_overtime_hours: actualOvertimeHours,
+        overtime_blocks: overtimeBlocks,
+        overtime_hours: overtimeBlocks * OVERTIME_BLOCK_MINUTES / 60,
         overtime_amount: overtimeAmount,
         orders_total: ordersTotal,
-        total_amount: totalAmount
+        cash_amount: cashAmount,
+        total_amount: totalAmount,
+        computed_for: checkoutDate
     };
 }
 
-module.exports = {
-    computeBill
-};
+module.exports = { computeBill: computeBill, peakHoursBetween: peakHoursBetween };

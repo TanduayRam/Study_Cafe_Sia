@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Cafe - Join Reports</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+    <div class="main">
+        <div class="topbar">
+            <h1>Join Reports</h1>
+            <div class="who" id="who"></div>
+        </div>
+        <div id="banner"></div>
+        <div id="content">
+<div class="card">
+    <div class="tabs">
+        <button class="btn" id="tab-users-roles" onclick="showReport('users-roles')">Users + roles</button>
+        <button class="btn" id="tab-idle-seats" onclick="showReport('idle-seats')">Idle seats</button>
+        <button class="btn" id="tab-reservation-orders" onclick="showReport('reservation-orders')">Reservation orders</button>
+        <button class="btn" id="tab-member-passes" onclick="showReport('member-passes')">Pass balances</button>
+        <button class="btn" id="tab-member-activity" onclick="showReport('member-activity')">Member activity</button>
+        <button class="btn" id="tab-menu-item-orders" onclick="showReport('menu-item-orders')">Menu item orders</button>
+    </div>
+    <div class="toolbar">
+        <div class="hint" id="reportInfo"></div>
+        <button class="btn primary" onclick="saveSnapshot()">Save as snapshot</button>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead id="reportHead"></thead>
+            <tbody id="reportRows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Saved snapshots</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Saved by</th><th>When</th><th></th></tr></thead>
+            <tbody id="snapshotRows"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="viewBox" style="display:none">
+    <h2 id="viewTitle"></h2>
+    <pre class="bill" id="viewBody" style="max-height:60vh;overflow:auto"></pre>
+    <button class="btn" onclick="closeView()">Close</button>
+</div>
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+<script>
+var currentReport = 'users-roles';   // which report is open
+var reportRows = [];                 // its rows
+var snapshots = [];
+
+// Descriptions of the join used by each report.
+var REPORT_INFO = {
+    'users-roles': 'INNER JOIN (Maldan) - users with their role',
+    'idle-seats': 'LEFT JOIN (Pastrana) - seats with no active reservation',
+    'reservation-orders': 'INNER JOIN + LEFT JOIN orders (Malingin) - reservations with order totals',
+    'member-passes': 'INNER JOIN (Pontunilla) - pass balance per member',
+    'member-activity': 'FULL OUTER via LEFT JOIN UNION RIGHT JOIN (Macias) - members with passes vs reservations',
+    'menu-item-orders': 'RIGHT JOIN (Javier) - how many times each menu item was ordered'
+};
+
+function yesNo(value) {
+    if (value) {
+        return 'Yes';
+    }
+    return 'No';
+}
+
+// Draws the table header and rows for the report that is open.
+function drawReport() {
+    var head = '';
+    var html = '';
+    var i;
+    var r;
+
+    if (currentReport === 'users-roles') {
+        head = '<tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Active</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+            html = html + '<tr><td>' + r.user_id + '</td><td>' + escapeHtml(r.name) + '</td><td>' + escapeHtml(r.email) +
+                '</td><td>' + badge(r.role) + '</td><td>' + yesNo(r.is_active) + '</td></tr>';
+        }
+    } else if (currentReport === 'idle-seats') {
+        head = '<tr><th>Seat ID</th><th>Seat</th><th>Zone</th><th>Seat status</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+            html = html + '<tr><td>' + r.seat_id + '</td><td>' + escapeHtml(r.seat_label) + '</td><td>' +
+                escapeHtml(r.zone_name) + '</td><td>' + badge(r.seat_status) + '</td></tr>';
+        }
+    } else if (currentReport === 'reservation-orders') {
+        head = '<tr><th>ID</th><th>Member</th><th>Zone</th><th>Seat</th><th>Start</th><th>Status</th><th>Orders</th><th>Orders total</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+            html = html + '<tr><td>' + r.reservation_id + '</td><td>' + escapeHtml(r.member_name) + '</td><td>' +
+                escapeHtml(r.zone_name) + '</td><td>' + escapeHtml(r.seat_label) + '</td><td>' + formatDate(r.start_time) +
+                '</td><td>' + badge(r.status) + '</td><td>' + r.order_count + '</td><td>' + formatMoney(r.orders_total) + '</td></tr>';
+        }
+    } else if (currentReport === 'member-passes') {
+        head = '<tr><th>Member</th><th>Package</th><th>Remaining</th><th>Expires</th><th>Expired</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+            html = html + '<tr><td>' + escapeHtml(r.member_name) + '</td><td>' + escapeHtml(r.package_name) + '</td><td>' +
+                formatNumber(r.remaining_hours) + ' / ' + formatNumber(r.package_hours) + ' h</td><td>' +
+                formatDateOnly(r.expires_on) + '</td><td>' + yesNo(r.is_expired) + '</td></tr>';
+        }
+    } else if (currentReport === 'member-activity') {
+        head = '<tr><th>Member</th><th>Passes</th><th>Hours left</th><th>Reservations</th><th>Last reservation</th><th>Activity</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+
+            var color = 'amber';                                   // Reservation only
+            if (r.activity === 'Both') color = 'green';
+            if (r.activity === 'Pass only') color = 'blue';
+
+            html = html + '<tr><td>' + escapeHtml(r.member_name) + '</td><td>' + r.pass_count + '</td><td>' +
+                formatNumber(r.remaining_hours) + '</td><td>' + r.reservation_count + '</td><td>' + formatDate(r.last_reservation) +
+                '</td><td><span class="badge b-' + color + '">' + escapeHtml(r.activity) + '</span></td></tr>';
+        }
+    } else if (currentReport === 'menu-item-orders') {
+        head = '<tr><th>Item</th><th>Category</th><th>Times ordered</th><th>Units sold</th></tr>';
+        for (i = 0; i < reportRows.length; i++) {
+            r = reportRows[i];
+            html = html + '<tr><td>' + escapeHtml(r.name) + '</td><td>' + escapeHtml(r.category) + '</td><td>' +
+                r.order_count + '</td><td>' + r.units_sold + '</td></tr>';
+        }
+    }
+
+    if (reportRows.length === 0) {
+        html = '<tr><td class="empty">No rows found.</td></tr>';
+    }
+
+    document.getElementById('reportHead').innerHTML = head;
+    document.getElementById('reportRows').innerHTML = html;
+}
+
+// Opens one report: asks the API and draws it.
+async function showReport(name) {
+    try {
+        showLoading();
+        currentReport = name;
+
+        var result = await callApi('/reports/' + name);
+        reportRows = result.data;
+
+        document.getElementById('reportInfo').textContent = REPORT_INFO[name] + ' - ' + reportRows.length + ' row(s)';
+        drawReport();
+
+        // Highlight the open tab.
+        for (var key in REPORT_INFO) {
+            document.getElementById('tab-' + key).className = 'btn';
+        }
+        document.getElementById('tab-' + name).className = 'btn active';
+
+        hideBanner();
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// ---- Snapshots ----
+
+async function loadSnapshots() {
+    try {
+        var result = await callApi('/report-snapshots');
+        snapshots = result.data;
+
+        var html = '';
+        for (var i = 0; i < snapshots.length; i++) {
+            var s = snapshots[i];
+            html = html + '<tr>' +
+                '<td>' + s.snapshot_id + '</td>' +
+                '<td>' + escapeHtml(s.title) + '</td>' +
+                '<td>' + escapeHtml(s.created_by_name) + '</td>' +
+                '<td>' + formatDate(s.created_at) + '</td>' +
+                '<td class="actions">' +
+                    '<button class="btn small" onclick="viewSnapshot(' + s.snapshot_id + ')">View</button> ' +
+                    '<button class="btn small danger" onclick="deleteSnapshot(' + s.snapshot_id + ')">Delete</button>' +
+                '</td></tr>';
+        }
+        if (snapshots.length === 0) {
+            html = '<tr><td colspan="5" class="empty">No snapshots saved yet.</td></tr>';
+        }
+        document.getElementById('snapshotRows').innerHTML = html;
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// Saves the rows now on screen.
+async function saveSnapshot() {
+    try {
+        var title = prompt('Snapshot title:', currentReport + ' ' + new Date().toLocaleDateString());
+        if (!title) {
+            return;
+        }
+        await callApi('/report-snapshots', 'POST', { title: title, report_data: { report: currentReport, rows: reportRows } });
+        showMessage('Snapshot saved.', false);
+        loadSnapshots();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+function viewSnapshot(id) {
+    var s = findById(snapshots, 'snapshot_id', id);
+    document.getElementById('viewTitle').textContent = s.title;
+    document.getElementById('viewBody').textContent = JSON.stringify(s.report_data, null, 2);
+    document.getElementById('viewBox').style.display = 'block';
+    document.getElementById('viewBox').scrollIntoView();
+}
+
+function closeView() {
+    document.getElementById('viewBox').style.display = 'none';
+}
+
+async function deleteSnapshot(id) {
+    if (confirm('Delete this snapshot?') === false) {
+        return;
+    }
+    try {
+        await callApi('/report-snapshots/' + id, 'DELETE');
+        showMessage('Snapshot deleted.', false);
+        loadSnapshots();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+// ---- start the page ----
+var currentUser = startPage('reports.html');
+if (currentUser) {
+    showReport('users-roles');
+    loadSnapshots();
+}
+</script>
+</body>
+</html>
