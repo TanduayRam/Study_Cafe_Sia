@@ -1,12 +1,12 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const snapshot = require('../controllers/report_snapshot_controller');
+const { authenticateToken, isAdminOrStaff } = require('../middleware/auth_middleware');
 
-const snapshotController = require('../controllers/report_snapshot_controller');
+router.use(authenticateToken, isAdminOrStaff);
 
-router.post('/', snapshotController.createSnapshot);
-
-router.get('/', snapshotController.getAllSnapshots);
-
-router.delete('/:id', snapshotController.deleteSnapshot);
+router.get('/', snapshot.getAll);
+router.get('/:id', snapshot.getById);
+router.post('/', snapshot.create);
+router.delete('/:id', snapshot.remove);
 
 module.exports = router;
