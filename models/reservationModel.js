@@ -3,6 +3,7 @@ const logAction = require('../utils/audit_logger');
 const sessionLogs = require('./session_logs_model');
 const { createError } = require('../utils/http');
 
+<<<<<<< Updated upstream
 const HOUR_MS = 3600000;
 
 // One reservation with its member, seat and zone.
@@ -38,6 +39,37 @@ async function getAll(filters) {
 
     sql = sql + ' ORDER BY r.reservation_id DESC';
     const [rows] = await db.query(sql, values);
+=======
+// Get all reservations with member, seat, and study zone details
+const getAll = async (userId) => {
+    let sql = `SELECT r.*, u.name AS member_name, s.label AS seat_label, sz.name AS zone_name
+               FROM reservations r
+               INNER JOIN users u ON r.user_id = u.user_id
+               INNER JOIN seats s ON r.seat_id = s.seat_id
+               INNER JOIN study_zones sz ON s.zone_id = sz.zone_id`;
+    const values = [];
+    if (userId !== undefined && userId !== null) {
+        sql += ' WHERE r.user_id = ?';
+        values.push(userId);
+    }
+    sql += ' ORDER BY r.reservation_id DESC';
+    const [rows] = await db.query(sql, values);
+    return rows;
+};
+
+
+const getCompletedByUser = async (userId) => {
+    const [rows] = await db.query(
+        `SELECT r.reservation_id, r.user_id, r.seat_id, r.start_time, r.end_time,
+                r.status, s.label AS seat_label, z.name AS zone_name
+         FROM reservations r
+         INNER JOIN seats s ON r.seat_id = s.seat_id
+         INNER JOIN study_zones z ON s.zone_id = z.zone_id
+         WHERE r.user_id = ? AND r.status = 'Completed'
+         ORDER BY r.end_time DESC, r.reservation_id DESC`,
+        [userId]
+    );
+>>>>>>> Stashed changes
     return rows;
 }
 
@@ -270,10 +302,19 @@ async function cancel(id, actor) {
 }
 
 module.exports = {
+<<<<<<< Updated upstream
     getAll: getAll,
     getById: getById,
     create: create,
     update: update,
     checkIn: checkIn,
     cancel: cancel
+=======
+    getAll,
+    getCompletedByUser,
+    getById,
+    create,
+    update,
+    remove
+>>>>>>> Stashed changes
 };

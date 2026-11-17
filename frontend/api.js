@@ -73,6 +73,8 @@ async function callApi(path, method, body) {
         var message = 'Something went wrong.';
         if (json && json.error && json.error.message) {
             message = json.error.message;
+        } else if (json && json.message) {
+            message = json.message;
         }
         throw new Error(message);
     }

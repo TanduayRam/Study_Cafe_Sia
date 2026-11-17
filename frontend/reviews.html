@@ -35,7 +35,16 @@
 </div>
 
 <div class="card">
-    <h2>All reviews</h2>
+    <h2>My review summary</h2>
+    <div class="row" id="reviewSummary">
+        <div class="card"><div class="muted">Average rating</div><h2 id="averageRating">0.00 / 5</h2></div>
+        <div class="card"><div class="muted">Total reviews</div><h2 id="totalReviews">0</h2></div>
+        <div class="card" style="flex:2"><div class="muted">Rating distribution</div><div id="ratingDistribution"></div></div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>My reviews</h2>
     <div class="tablewrap">
         <table>
             <thead><tr><th>ID</th><th>Member</th><th>Seat</th><th>Rating</th><th>Comment</th><th>Date</th><th></th></tr></thead>
@@ -47,132 +56,148 @@
     </div>
 </div>
 
+<div id="editModal" class="modal-backdrop" style="display:none" role="dialog" aria-modal="true" aria-labelledby="editReviewTitle">
+    <div class="modal-card">
+        <h2 id="editReviewTitle">Edit review</h2>
+        <label for="editRating">Rating</label>
+        <select id="editRating">
+            <option value="5">5 - ★★★★★</option><option value="4">4 - ★★★★☆</option>
+            <option value="3">3 - ★★★☆☆</option><option value="2">2 - ★★☆☆☆</option>
+            <option value="1">1 - ★☆☆☆☆</option>
+        </select>
+        <label for="editComment">Comment</label>
+        <textarea id="editComment" maxlength="500" rows="4"></textarea>
+        <div class="modal-actions">
+            <button class="btn" type="button" onclick="closeEditModal()">Cancel</button>
+            <button class="btn primary" type="button" onclick="submitEditReview()">Save changes</button>
+        </div>
+    </div>
+</div>
+
 <script src="api.js"></script>
 <script>
 var currentUser = null;
 var reviews = [];
+var editingReviewId = null;
 
-// Turns 4 into "★★★★☆".
 function makeStars(rating) {
     var text = '';
-    for (var i = 1; i <= 5; i++) {
-        if (i <= rating) {
-            text = text + '\u2605';
-        } else {
-            text = text + '\u2606';
-        }
-    }
+    for (var i = 1; i <= 5; i++) text += i <= rating ? '\u2605' : '\u2606';
     return text;
+}
+
+function renderSummary(summary) {
+    document.getElementById('averageRating').textContent = Number(summary.average_rating || 0).toFixed(2) + ' / 5';
+    document.getElementById('totalReviews').textContent = summary.total_reviews || 0;
+    var distribution = summary.rating_distribution || {};
+    var html = '';
+    for (var rating = 5; rating >= 1; rating--) {
+        var count = Number(distribution[rating] || 0);
+        var total = Number(summary.total_reviews || 0);
+        var percent = total ? Math.round(count * 100 / total) : 0;
+        html += '<div class="rating-line"><span>' + rating + ' &#9733;</span>' +
+            '<div class="rating-track"><span style="width:' + percent + '%"></span></div><span>' + count + '</span></div>';
+    }
+    document.getElementById('ratingDistribution').innerHTML = html;
 }
 
 async function loadReviews() {
     try {
         showLoading();
         var result = await callApi('/reviews');
-        reviews = result.data;
-
-        // Which reservations already have a review?
+        reviews = result.data.reviews || [];
+        renderSummary(result.data.summary || {});
         var reviewedIds = [];
-
         var html = '';
         for (var i = 0; i < reviews.length; i++) {
             var r = reviews[i];
-            reviewedIds.push(r.reservation_id);
-
-            // Only the author or an Admin may change a review.
-            var buttons = '';
-            if (currentUser.role === 'Admin' || r.user_id === currentUser.user_id) {
-                buttons = '<button class="btn small" onclick="editReview(' + r.review_id + ')">Edit</button> ' +
-                          '<button class="btn small danger" onclick="deleteReview(' + r.review_id + ')">Delete</button>';
-            }
-
-            html = html + '<tr>' +
-                '<td>' + r.review_id + '</td>' +
-                '<td>' + escapeHtml(r.member_name) + '</td>' +
+            reviewedIds.push(String(r.reservation_id));
+            var buttons = '<button class="btn small" onclick="openEditModal(' + r.review_id + ')">Edit</button> ' +
+                '<button class="btn small danger" onclick="deleteReview(' + r.review_id + ')">Delete</button>';
+            html += '<tr><td>' + r.review_id + '</td><td>' + escapeHtml(r.member_name) + '</td>' +
                 '<td>' + escapeHtml(r.zone_name) + ' - ' + escapeHtml(r.seat_label) + '</td>' +
-                '<td>' + makeStars(r.rating) + '</td>' +
-                '<td>' + escapeHtml(r.comment) + '</td>' +
-                '<td>' + formatDate(r.created_at) + '</td>' +
-                '<td class="actions">' + buttons + '</td></tr>';
+                '<td>' + makeStars(r.rating) + '</td><td>' + escapeHtml(r.comment) + '</td>' +
+                '<td>' + formatDate(r.created_at) + '</td><td class="actions">' + buttons + '</td></tr>';
         }
-        if (reviews.length === 0) {
-            html = '<tr><td colspan="7" class="empty">No reviews yet.</td></tr>';
-        }
+        if (!reviews.length) html = '<tr><td colspan="7" class="empty">You have not submitted any reviews yet.</td></tr>';
         document.getElementById('rows').innerHTML = html;
 
-        // Fill the dropdown with Completed reservations that have no review yet.
-        var completed = await callApi('/reservations?status=Completed');
+        var completed = await callApi('/reviews/eligible-reservations');
         var options = '';
         for (var j = 0; j < completed.data.length; j++) {
             var c = completed.data[j];
-            if (reviewedIds.indexOf(c.reservation_id) === -1) {
-                options = options + '<option value="' + c.reservation_id + '">#' + c.reservation_id + ' ' +
+            if (reviewedIds.indexOf(String(c.reservation_id)) === -1) {
+                options += '<option value="' + c.reservation_id + '">#' + c.reservation_id + ' ' +
                     escapeHtml(c.zone_name) + ' - ' + escapeHtml(c.seat_label) + '</option>';
             }
         }
-        if (options === '') {
-            options = '<option value="">No completed reservations to review</option>';
-        }
-        document.getElementById('reservationSelect').innerHTML = options;
-
+        document.getElementById('reservationSelect').innerHTML = options ||
+            '<option value="">No completed reservations available to review</option>';
         hideBanner();
-    } catch (error) {
-        showError(error.message);
-    }
+    } catch (error) { showError(error.message); }
 }
 
 async function saveReview() {
     try {
-        var body = {
-            reservation_id: document.getElementById('reservationSelect').value,
+        var reservationId = document.getElementById('reservationSelect').value;
+        if (!reservationId) throw new Error('There is no completed reservation available to review.');
+        var result = await callApi('/reviews', 'POST', {
+            reservation_id: reservationId,
             rating: document.getElementById('ratingSelect').value,
             comment: document.getElementById('commentInput').value
-        };
-        var result = await callApi('/reviews', 'POST', body);
+        });
         document.getElementById('commentInput').value = '';
         showMessage(result.message, false);
-        loadReviews();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
+        await loadReviews();
+    } catch (error) { showMessage(error.message, true); }
 }
 
-async function editReview(id) {
-    var r = findById(reviews, 'review_id', id);
+function openEditModal(id) {
+    var review = findById(reviews, 'review_id', id);
+    if (!review) return;
+    editingReviewId = review.review_id;
+    document.getElementById('editRating').value = String(review.rating);
+    document.getElementById('editComment').value = review.comment || '';
+    document.getElementById('editModal').style.display = 'flex';
+    document.getElementById('editRating').focus();
+}
 
-    var rating = prompt('New rating (1-5):', r.rating);
-    if (!rating) {
-        return;
-    }
-    var comment = prompt('Comment:', r.comment || '');
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    editingReviewId = null;
+}
 
+async function submitEditReview() {
+    if (!editingReviewId) return;
     try {
-        var result = await callApi('/reviews/' + id, 'PUT', { rating: rating, comment: comment });
+        var result = await callApi('/reviews/' + editingReviewId, 'PUT', {
+            rating: document.getElementById('editRating').value,
+            comment: document.getElementById('editComment').value
+        });
+        closeEditModal();
         showMessage(result.message, false);
-        loadReviews();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
+        await loadReviews();
+    } catch (error) { showMessage(error.message, true); }
 }
 
 async function deleteReview(id) {
-    if (confirm('Delete this review?') === false) {
-        return;
-    }
+    if (!confirm('Delete this review?')) return;
     try {
         var result = await callApi('/reviews/' + id, 'DELETE');
         showMessage(result.message, false);
-        loadReviews();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
+        await loadReviews();
+    } catch (error) { showMessage(error.message, true); }
 }
 
-// ---- start the page ----
+document.getElementById('editModal').addEventListener('click', function (event) {
+    if (event.target.id === 'editModal') closeEditModal();
+});
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') closeEditModal();
+});
+
 currentUser = startPage('reviews.html');
-if (currentUser) {
-    loadReviews();
-}
+if (currentUser) loadReviews();
 </script>
 </body>
 </html>

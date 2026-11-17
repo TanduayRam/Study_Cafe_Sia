@@ -104,7 +104,7 @@ function startEngineTimer() {
     console.log('Automatic engine is ON (every ' + seconds + ' seconds).');
 }
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3123);
 
 // Only start the server when this file is run directly (npm start).
 if (require.main === module) {

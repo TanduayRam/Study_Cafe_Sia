@@ -32,7 +32,7 @@ async function createAdmin() {
         }
 
         const [existing] = await db.query(
-            'SELECT id FROM users WHERE email = ?',
+            'SELECT user_id FROM users WHERE email = ?',
             [email]
         );
 
@@ -41,8 +41,8 @@ async function createAdmin() {
         }
 
         const [roles] = await db.query(
-            'SELECT id FROM roles WHERE name = ?',
-            ['admin']
+            'SELECT role_id FROM roles WHERE name = ?',
+            ['Admin']
         );
 
         if (roles.length === 0) {
@@ -54,7 +54,7 @@ async function createAdmin() {
         const [result] = await db.query(
             `INSERT INTO users (name, email, password, role_id)
              VALUES (?, ?, ?, ?)`,
-            [name, email, hashedPassword, roles[0].id]
+            [name, email, hashedPassword, roles[0].role_id]
         );
 
         console.log('\nAdministrator created successfully!');
