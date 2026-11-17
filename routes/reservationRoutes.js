@@ -1,26 +1,19 @@
-const router = require('express').Router();
-const reservation = require('../controllers/reservationController');
-const { authenticateToken, isAdminOrStaff } = require('../middleware/auth_middleware');
+const express = require('express');
+const router = express.Router();
 
-router.use(authenticateToken);
+const reservationController = require('../controllers/reservationController');
+const checkoutController = require('../controllers/checkout_controller');
 
-// A Member can only see and change their own reservations (the controller checks this).
-router.get('/', reservation.getAll);
-router.get('/:id', reservation.getById);
-router.post('/', reservation.create);
-router.put('/:id', reservation.update);
-router.delete('/:id', reservation.remove);
+const {
+    authenticateToken,
+    authorizeRoles
+} = require('../middleware/auth_middleware');
 
-<<<<<<< Updated upstream
-// Front-desk actions: only Admin and Staff.
-router.post('/:id/check-in', isAdminOrStaff, reservation.checkIn);
-router.post('/:id/check-out', isAdminOrStaff, reservation.checkOut);
-=======
 // View all reservations: Admin and Staff
 router.get(
     '/',
     authenticateToken,
-    authorizeRoles('admin', 'staff', 'member'),
+    authorizeRoles('admin', 'staff'),
     reservationController.getAll
 );
 
@@ -28,7 +21,7 @@ router.get(
 router.get(
     '/:id',
     authenticateToken,
-    authorizeRoles('admin', 'staff', 'member'),
+    authorizeRoles('admin', 'staff', 'customer'),
     reservationController.getById
 );
 
@@ -36,7 +29,7 @@ router.get(
 router.post(
     '/',
     authenticateToken,
-    authorizeRoles('admin', 'staff', 'member'),
+    authorizeRoles('admin', 'staff', 'customer'),
     reservationController.create
 );
 
@@ -44,7 +37,7 @@ router.post(
 router.put(
     '/:id',
     authenticateToken,
-    authorizeRoles('admin', 'member'),
+    authorizeRoles('admin', 'customer'),
     reservationController.update
 );
 
@@ -71,6 +64,5 @@ router.delete(
     authorizeRoles('admin', 'member'),
     reservationController.remove
 );
->>>>>>> Stashed changes
 
 module.exports = router;

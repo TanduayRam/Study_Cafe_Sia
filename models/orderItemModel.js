@@ -1,60 +1,24 @@
 const db = require('../config/databases');
-const { createError, roundMoney } = require('../utils/http');
 
-<<<<<<< Updated upstream
-// One line of an order, with the item name.
-const SELECT_ITEM =
-    'SELECT oi.order_item_id, oi.order_id, oi.item_id, m.name AS item_name, ' +
-    'oi.quantity, oi.unit_price, oi.subtotal ' +
-    'FROM order_items oi INNER JOIN menu_items m ON oi.item_id = m.item_id';
-=======
 // Get all items belonging to an order
 const getByOrderId = async (orderId) => {
     const [rows] = await db.query(
         `SELECT
             oi.order_item_id,
             oi.order_id,
-            oi.item_id,
+            oi.menu_item_id,
             mi.name AS menu_item_name,
             oi.quantity,
             oi.unit_price,
             oi.subtotal
          FROM order_items oi
          INNER JOIN menu_items mi
-            ON oi.item_id = mi.item_id
+            ON oi.menu_item_id = mi.menu_item_id
          WHERE oi.order_id = ?`,
         [orderId]
     );
->>>>>>> Stashed changes
 
-async function getAll(filters) {
-    if (!filters) filters = {};
-
-    let sql = SELECT_ITEM;
-    const values = [];
-
-    if (filters.order_id) {
-        sql = sql + ' WHERE oi.order_id = ?';
-        values.push(filters.order_id);
-    }
-
-    sql = sql + ' ORDER BY oi.order_item_id DESC';
-    const [rows] = await db.query(sql, values);
     return rows;
-}
-
-<<<<<<< Updated upstream
-async function getByOrderId(orderId, connection) {
-    if (!connection) connection = db;
-    const [rows] = await connection.query(SELECT_ITEM + ' WHERE oi.order_id = ? ORDER BY oi.order_item_id', [orderId]);
-    return rows;
-}
-
-async function getById(id) {
-    const [rows] = await db.query(SELECT_ITEM + ' WHERE oi.order_item_id = ?', [id]);
-    return rows[0];
-}
-=======
 // Add an item to an order
 const create = async (connection, item) => {
     const {
@@ -71,7 +35,6 @@ const create = async (connection, item) => {
         VALUES (?, ?, ?, ?, ?)`,
         [order_id, item_id, quantity, unit_price, subtotal]
     );
->>>>>>> Stashed changes
 
 // Checks the list [{ item_id, quantity }] and joins duplicates (same item twice becomes one line).
 // Returns the list sorted by item_id. Throws 400 if something is wrong.
@@ -138,19 +101,29 @@ async function insertItems(connection, orderId, lines) {
 
         // Subtract the stock.
         await connection.query('UPDATE menu_items SET stock = stock - ? WHERE item_id = ?', [line.quantity, line.item_id]);
+};
 
-        // Save the order line with the price at this moment.
-        await connection.query(
-            'INSERT INTO order_items (order_id, item_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
-            [orderId, line.item_id, line.quantity, item.price, roundMoney(item.price * line.quantity)]
-        );
-    }
-}
+// Add an item to an order
+const create = async (connection, item) => {
+    const {
+        order_id,
+        menu_item_id,
+        quantity,
+        unit_price,
+        subtotal
+    } = item;
+
+    const [result] = await connection.query(
+        `INSERT INTO order_items
+        (order_id, menu_item_id, quantity, unit_price, subtotal)
+        VALUES (?, ?, ?, ?, ?)`,
+        [order_id, menu_item_id, quantity, unit_price, subtotal]
+    );
+
+    return result.insertId;
+};
 
 module.exports = {
-    getAll: getAll,
-    getByOrderId: getByOrderId,
-    getById: getById,
-    normalizeItems: normalizeItems,
-    insertItems: insertItems
+    getByOrderId,
+    create
 };
