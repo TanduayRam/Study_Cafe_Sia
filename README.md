@@ -129,7 +129,7 @@ In VS Code, open the integrated terminal and run:
 npm start
 ```
 
-Wait for the message `Study Cafe server running at http://localhost:3001`.
+Wait for the message `Study Cafe server running at http://localhost:3123`.
 Keep the terminal running while using the application.
 
 ### Step 9. Open the Application
@@ -138,7 +138,7 @@ Open your preferred web browser (Google Chrome, Microsoft Edge, or Firefox).
 Enter the following address in the browser:
 
 ```text
-http://localhost:3001/
+http://localhost:3123/
 ```
 
 Press Enter to access the system login page. Make sure the backend server is still running while accessing the application.

@@ -212,3 +212,15 @@ pre.bill { background: #f8f5ef; border: 1px solid #eee8df; border-radius: 8px; p
     .login-section { padding: 55px 8%; }
     .login-heading h2 { font-size: 30px; }
 }
+
+/* Reviews page: compact summary and edit dialog */
+.rating-line { display:flex; align-items:center; gap:10px; margin:6px 0; }
+.rating-line > span:first-child { width:34px; }
+.rating-line > span:last-child { width:24px; text-align:right; }
+.rating-track { flex:1; height:9px; background:#ececf1; border-radius:20px; overflow:hidden; }
+.rating-track span { display:block; height:100%; background:#e6ad42; border-radius:20px; }
+.modal-backdrop { position:fixed; inset:0; z-index:1000; background:rgba(20,20,30,.55); align-items:center; justify-content:center; padding:20px; }
+.modal-card { width:min(100%, 480px); background:#fff; border-radius:14px; padding:24px; box-shadow:0 18px 60px rgba(0,0,0,.22); }
+.modal-card label { display:block; margin:14px 0 6px; }
+.modal-card select, .modal-card textarea { width:100%; box-sizing:border-box; }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }

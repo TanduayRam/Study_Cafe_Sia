@@ -1,6 +1,35 @@
 const db = require('../config/databases');
 
 // Get all reservations with member, seat, and study zone details
+const getAll = async (userId) => {
+    let sql = `SELECT r.*, u.name AS member_name, s.label AS seat_label, sz.name AS zone_name
+               FROM reservations r
+               INNER JOIN users u ON r.user_id = u.user_id
+               INNER JOIN seats s ON r.seat_id = s.seat_id
+               INNER JOIN study_zones sz ON s.zone_id = sz.zone_id`;
+    const values = [];
+    if (userId !== undefined && userId !== null) {
+        sql += ' WHERE r.user_id = ?';
+        values.push(userId);
+    }
+    sql += ' ORDER BY r.reservation_id DESC';
+    const [rows] = await db.query(sql, values);
+    return rows;
+};
+
+
+const getCompletedByUser = async (userId) => {
+    const [rows] = await db.query(
+        `SELECT r.reservation_id, r.user_id, r.seat_id, r.start_time, r.end_time,
+                r.status, s.label AS seat_label, z.name AS zone_name
+         FROM reservations r
+         INNER JOIN seats s ON r.seat_id = s.seat_id
+         INNER JOIN study_zones z ON s.zone_id = z.zone_id
+         WHERE r.user_id = ? AND r.status = 'Completed'
+         ORDER BY r.end_time DESC, r.reservation_id DESC`,
+        [userId]
+    );
+// Get all reservations with member, seat, and study zone details
 const getAll = async () => {
     const [rows] = await db.query(
         `SELECT
@@ -82,6 +111,8 @@ const remove = async (id) => {
 
 // Export functions so the controller can use them
 module.exports = {
+    getAll,
+    getCompletedByUser,
     getAll,
     getById,
     create,

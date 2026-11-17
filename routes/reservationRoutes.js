@@ -61,7 +61,7 @@ router.post(
 router.delete(
     '/:id',
     authenticateToken,
-    authorizeRoles('admin', 'customer'),
+    authorizeRoles('admin', 'member'),
     reservationController.remove
 );
 

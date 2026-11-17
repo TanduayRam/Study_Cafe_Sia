@@ -55,7 +55,7 @@ const create = async (req, res) => {
     const itemQuantities = new Map();
 
     for (const item of items) {
-        const menuItemId = Number(item.menu_item_id);
+        const menuItemId = Number(item.item_id);
         const quantity = Number(item.quantity);
 
         if (!Number.isInteger(menuItemId) || menuItemId <= 0 ||
@@ -113,7 +113,7 @@ const create = async (req, res) => {
             // Lock the menu item while checking its stock
             const [menuItems] = await connection.query(
                 `SELECT * FROM menu_items
-                 WHERE menu_item_id = ?
+                 WHERE item_id = ?
                  FOR UPDATE`,
                 [menuItemId]
             );
@@ -142,14 +142,14 @@ const create = async (req, res) => {
             await connection.query(
                 `UPDATE menu_items
                  SET stock = stock - ?
-                 WHERE menu_item_id = ?`,
+                 WHERE item_id = ?`,
                 [quantity, menuItemId]
             );
 
             // Save the order item
             await orderItemModel.create(connection, {
                 order_id: orderId,
-                menu_item_id: menuItemId,
+                item_id: menuItemId,
                 quantity,
                 unit_price: menuItem.price,
                 subtotal: (subtotalCents / 100).toFixed(2)

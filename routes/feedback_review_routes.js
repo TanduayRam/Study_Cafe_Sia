@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth_middleware');
 router.use(authenticateToken);
 
 router.get('/', review.getAll);
+router.get('/eligible-reservations', review.getEligibleReservations);
 router.get('/:id', review.getById);
 router.post('/', review.create);
 router.put('/:id', review.update);

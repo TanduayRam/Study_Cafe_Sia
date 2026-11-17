@@ -1,89 +1,66 @@
 const db = require('../config/databases');
 const logAction = require('../utils/audit_logger');
-
-const SYSTEM_USER_ID = 7;
+const sessionLogsModel = require('./session_logs_model');
 
 async function releaseNoShows(now = new Date()) {
     const currentTime = new Date(now);
-
-    if (isNaN(currentTime.getTime())) {
-        throw new Error('Invalid date and time.');
-    }
+    if (isNaN(currentTime.getTime())) throw new Error('Invalid date and time.');
 
     const connection = await db.getConnection();
-
     try {
         await connection.beginTransaction();
-
         const [reservations] = await connection.query(
-            `SELECT reservation_id, user_id, seat_id
-             FROM reservations
-             WHERE status = 'Confirmed'
-               AND start_time <= DATE_SUB(?, INTERVAL 15 MINUTE)
+            `SELECT r.reservation_id, r.user_id, r.seat_id, r.start_time, r.end_time, s.zone_id
+             FROM reservations r
+             INNER JOIN seats s ON r.seat_id = s.seat_id
+             WHERE r.status = 'Confirmed'
+               AND r.start_time <= DATE_SUB(?, INTERVAL 15 MINUTE)
              FOR UPDATE`,
             [currentTime]
         );
 
         const releasedReservations = [];
-
         for (const reservation of reservations) {
             const [reservationResult] = await connection.query(
-                `UPDATE reservations
-                 SET status = 'No-Show'
-                 WHERE reservation_id = ?
-                   AND status = 'Confirmed'`,
+                `UPDATE reservations SET status = 'NoShow'
+                 WHERE reservation_id = ? AND status = 'Confirmed'`,
                 [reservation.reservation_id]
             );
-
-            if (reservationResult.affectedRows === 0) {
-                continue;
-            }
+            if (reservationResult.affectedRows === 0) continue;
 
             const [seatResult] = await connection.query(
-                `UPDATE seats
-                 SET status = 'Available'
-                 WHERE seat_id = ?`,
+                'UPDATE seats SET status = \'Available\' WHERE seat_id = ?',
                 [reservation.seat_id]
             );
+            await sessionLogsModel.recordNoShow(connection, {
+                reservation_id: reservation.reservation_id,
+                user_id: reservation.user_id,
+                zone_id: reservation.zone_id,
+                seat_id: reservation.seat_id,
+                start_time: reservation.start_time,
+                end_time: reservation.end_time
+            }, currentTime);
 
-            await logAction({
-                userId: SYSTEM_USER_ID,
-                action: 'NO_SHOW',
-                tableName: 'reservations',
-                recordId: reservation.reservation_id,
-                description: `Reservation ${reservation.reservation_id} was automatically marked as No-Show after the 15-minute grace period.`
-            }, connection);
-
+            await logAction(null, 'NO_SHOW', 'reservations', reservation.reservation_id,
+                `Reservation ${reservation.reservation_id} was automatically marked as NoShow after the 15-minute grace period.`, connection);
             if (seatResult.affectedRows > 0) {
-                await logAction({
-                    userId: SYSTEM_USER_ID,
-                    action: 'RELEASE_SEAT',
-                    tableName: 'seats',
-                    recordId: reservation.seat_id,
-                    description: `Seat ${reservation.seat_id} was released because reservation ${reservation.reservation_id} was marked as No-Show.`
-                }, connection);
+                await logAction(null, 'RELEASE_SEAT', 'seats', reservation.seat_id,
+                    `Seat ${reservation.seat_id} was released because reservation ${reservation.reservation_id} was marked as NoShow.`, connection);
             }
-
             releasedReservations.push({
                 reservation_id: reservation.reservation_id,
                 user_id: reservation.user_id,
                 seat_id: reservation.seat_id
             });
         }
-
         await connection.commit();
-
         return releasedReservations;
-
     } catch (error) {
         await connection.rollback();
         throw error;
-
     } finally {
         connection.release();
     }
 }
 
-module.exports = {
-    releaseNoShows
- };
+module.exports = { releaseNoShows };

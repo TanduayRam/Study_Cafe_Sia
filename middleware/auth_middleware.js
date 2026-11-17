@@ -57,12 +57,22 @@ function makeRoleCheck(allowedRoles) {
     };
 }
 
+// Compatibility helper for route modules that declare roles in lowercase.
+function authorizeRoles() {
+    const allowed = Array.from(arguments).map(function (role) {
+        const value = String(role).toLowerCase();
+        return value.charAt(0).toUpperCase() + value.slice(1);
+    });
+    return makeRoleCheck(allowed);
+}
+
 const isAdmin = makeRoleCheck(['Admin']);
 const isAdminOrStaff = makeRoleCheck(['Admin', 'Staff']);
 
 module.exports = {
     authenticateToken: authenticateToken,
     isAdmin: isAdmin,
+    authorizeRoles: authorizeRoles,
     isAdminOrStaff: isAdminOrStaff,
     hashToken: hashToken
 };
