@@ -15,11 +15,11 @@ async function getAll() {
             COALESCE(SUM(o.total_amount), 0.00) AS orders_total
         FROM reservations AS r
         INNER JOIN users AS u
-            ON r.user_id = u.id
+            ON r.user_id = u.user_id
         INNER JOIN seats AS s
             ON r.seat_id = s.seat_id
         INNER JOIN study_zones AS sz
-            ON s.study_zone_id = sz.study_zone_id
+            ON s.zone_id = sz.zone_id
         LEFT JOIN orders AS o
             ON r.reservation_id = o.reservation_id
         GROUP BY
@@ -38,5 +38,5 @@ async function getAll() {
 }
 
 module.exports = {
-    getAll
+    getAll: getAll
 };

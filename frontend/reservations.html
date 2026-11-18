@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Study Cafe - Reservations</title>
+    <link rel="stylesheet" href="app.css">
+
+    <style>
+        .receipt-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .receipt-item {
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .receipt-item small {
+            display: block;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .receipt-item strong {
+            font-size: 17px;
+        }
+
+        .receipt-total {
+            margin-top: 16px;
+            padding: 16px;
+            background: #eff6ff;
+            border-radius: 8px;
+        }
+
+        .receipt-total h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .receipt-table {
+            width: 100%;
+            margin-top: 16px;
+        }
+
+        .receipt-table th,
+        .receipt-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .receipt-actions {
+            margin-top: 16px;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #receiptCard,
+            #receiptCard * {
+                visibility: visible;
+            }
+
+            #receiptCard {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                box-shadow: none;
+            }
+
+            .receipt-actions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="shell">
+    <div class="sidebar" id="menu"></div>
+
+    <div class="main">
+        <div class="topbar">
+            <h1>Reservations</h1>
+            <div class="who" id="who"></div>
+        </div>
+
+        <div id="banner"></div>
+
+        <div id="content">
+
+            <!-- Reservation form -->
+            <div class="card">
+                <div class="toolbar">
+                    <h2 id="formTitle">Create Reservation</h2>
+                </div>
+
+                <form id="reservationForm">
+                    <input type="hidden" id="reservationId">
+
+                    <div class="grid">
+
+                        <div id="memberField" style="display:none">
+                            <label for="memberId">Member</label>
+                            <select id="memberId">
+                                <option value="">Loading members...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="seatId">Seat</label>
+                            <select id="seatId" required>
+                                <option value="">Loading seats...</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="startTime">Start Time</label>
+                            <input type="datetime-local" id="startTime" required>
+                        </div>
+
+                        <div>
+                            <label for="endTime">End Time</label>
+                            <input type="datetime-local" id="endTime" required>
+                        </div>
+
+                    </div>
+
+                    <div style="margin-top:16px">
+                        <button type="submit" class="btn primary" id="saveButton">
+                            Create Reservation
+                        </button>
+
+                        <button type="button" class="btn" onclick="resetForm()">
+                            Clear
+                        </button>
+                    </div>
+
+                    <div id="formMessage"></div>
+                </form>
+            </div>
+
+            <!-- Checkout receipt -->
+            <div class="card" id="receiptCard" style="display:none; margin-top:16px">
+                <div class="toolbar">
+                    <h2>Checkout Receipt</h2>
+                    <span class="badge">Payment Recorded</span>
+                </div>
+
+                <div id="receiptContent"></div>
+
+                <div class="receipt-actions">
+                    <button class="btn primary" onclick="window.print()">
+                        Print Receipt
+                    </button>
+
+                    <button class="btn" onclick="closeReceipt()">
+                        Close Receipt
+                    </button>
+                </div>
+            </div>
+
+            <!-- Reservation records -->
+            <div class="card" style="margin-top:16px">
+                <div class="toolbar">
+                    <h2>Reservation Records</h2>
+
+                    <button class="btn" onclick="refreshPage()">
+                        Refresh
+                    </button>
+                </div>
+
+                <div style="overflow-x:auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Member</th>
+                                <th>Seat</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="reservationsTableBody">
+                            <tr>
+                                <td colspan="7">Loading reservations...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="reservationsMessage"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="api.js"></script>
+
+<script>
+var currentUser = null;
+var reservations = [];
+var seats = [];
+var members = [];
+
+var isAdminOrStaffUser = false;
+
+function showFormMessage(message, isError) {
+    var box = document.getElementById('formMessage');
+
+    box.textContent = message;
+    box.style.color = isError ? '#dc2626' : '#15803d';
+}
+
+function resetForm() {
+    document.getElementById('reservationForm').reset();
+
+    document.getElementById('reservationId').value = '';
+    document.getElementById('saveButton').textContent = 'Create Reservation';
+    document.getElementById('formTitle').textContent = 'Create Reservation';
+    document.getElementById('memberId').disabled = false;
+
+    showFormMessage('', false);
+}
+
+function formatMoney(value) {
+    var amount = Number(value);
+
+    if (!Number.isFinite(amount)) {
+        amount = 0;
+    }
+
+    return '₱' + amount.toFixed(2);
+}
+
+function escapeReceipt(value) {
+    var div = document.createElement('div');
+    div.textContent = value === null || value === undefined ? '' : String(value);
+    return div.innerHTML;
+}
+
+function closeReceipt() {
+    document.getElementById('receiptCard').style.display = 'none';
+}
+
+function displayReceipt(data) {
+    var container = document.getElementById('receiptContent');
+
+    var deductions = Array.isArray(data.pass_deductions)
+        ? data.pass_deductions
+        : [];
+
+    var deductionRows = '';
+
+    if (deductions.length > 0) {
+        deductions.forEach(function (item) {
+            deductionRows +=
+                '<tr>' +
+                    '<td>' + escapeReceipt(item.member_pass_id) + '</td>' +
+                    '<td>' + Number(item.hours_used).toFixed(2) + ' hours</td>' +
+                '</tr>';
+        });
+    } else {
+        deductionRows =
+            '<tr><td colspan="2">No member passes used.</td></tr>';
+    }
+
+    container.innerHTML = `
+        <div class="receipt-grid">
+            <div class="receipt-item">
+                <small>Reservation ID</small>
+                <strong>${escapeReceipt(data.reservation_id)}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Payment ID</small>
+                <strong>${escapeReceipt(data.payment && data.payment.payment_id || '-')}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Study Zone</small>
+                <strong>${escapeReceipt(data.zone_name)}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Zone Type</small>
+                <strong>${escapeReceipt(data.zone_type)}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Billable Hours</small>
+                <strong>${Number(data.billable_hours).toFixed(2)} hours</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Hourly Rate</small>
+                <strong>${formatMoney(data.hourly_rate)}</strong>
+            </div>
+        </div>
+
+        <h3 style="margin-top:20px">Member Pass Deductions</h3>
+
+        <div style="overflow-x:auto">
+            <table class="receipt-table">
+                <thead>
+                    <tr>
+                        <th>Pass ID</th>
+                        <th>Hours Used</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${deductionRows}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="receipt-grid">
+            <div class="receipt-item">
+                <small>Pass Hours Used</small>
+                <strong>${Number(data.pass_hours_used).toFixed(2)} hours</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Pass Amount</small>
+                <strong>${formatMoney(data.pass_amount)}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Cash Amount</small>
+                <strong>${formatMoney(data.cash_amount)}</strong>
+            </div>
+
+            <div class="receipt-item">
+                <small>Payment Method</small>
+                <strong>${escapeReceipt(data.payment_method)}</strong>
+            </div>
+        </div>
+
+        <div class="receipt-total">
+            <small>Total Reservation Charge</small>
+            <h2>${formatMoney(data.total_amount)}</h2>
+        </div>
+
+        <p style="margin-top:12px">
+            Payment Status:
+            <strong>${escapeReceipt(data.payment && data.payment.status || 'Paid')}</strong>
+        </p>
+    `;
+
+    document.getElementById('receiptCard').style.display = 'block';
+
+    document.getElementById('receiptCard').scrollIntoView({
+        behavior: 'smooth'
+    });
+}
+
+async function loadSeats() {
+    var result = await callApi('/seats');
+    seats = result.data || [];
+
+    var select = document.getElementById('seatId');
+    select.innerHTML = '<option value="">Select a seat</option>';
+
+    seats.forEach(function (seat) {
+        if (seat.status === 'Available') {
+            var option = document.createElement('option');
+
+            option.value = seat.seat_id;
+            option.textContent =
+                (seat.label || ('Seat ' + seat.seat_id)) +
+                ' - ' + (seat.zone_name || ('Zone ' + seat.zone_id));
+
+            select.appendChild(option);
+        }
+    });
+
+    if (select.options.length === 1) {
+        select.innerHTML = '<option value="">No available seats</option>';
+    }
+}
+
+async function loadMembers() {
+    if (!isAdminOrStaffUser) {
+        return;
+    }
+
+    var result = await callApi('/users/members');
+    members = result.data || [];
+
+    var select = document.getElementById('memberId');
+
+    select.innerHTML = '<option value="">Select a member</option>';
+
+    members.forEach(function (member) {
+        var option = document.createElement('option');
+
+        option.value = member.user_id;
+        option.textContent = member.name + ' (' + member.email + ')';
+
+        select.appendChild(option);
+    });
+}
+
+async function loadReservations() {
+    var tbody = document.getElementById('reservationsTableBody');
+
+    tbody.innerHTML =
+        '<tr><td colspan="7">Loading reservations...</td></tr>';
+
+    try {
+        var result = await callApi('/reservations');
+
+        reservations = result.data || [];
+
+        if (!Array.isArray(reservations)) {
+            reservations = [];
+        }
+
+        tbody.innerHTML = '';
+
+        if (reservations.length === 0) {
+            tbody.innerHTML =
+                '<tr><td colspan="7">No reservations found.</td></tr>';
+            return;
+        }
+
+        reservations.forEach(function (reservation) {
+            var row = document.createElement('tr');
+
+            var actions = '';
+            var id = Number(reservation.reservation_id);
+
+            if (isAdminOrStaffUser) {
+                if (reservation.status === 'Confirmed') {
+                    actions +=
+                        '<button class="btn" onclick="checkInReservation(' +
+                        id + ')">Check In</button> ';
+
+                    actions +=
+                        '<button class="btn" onclick="editReservation(' +
+                        id + ')">Edit</button> ';
+                }
+
+                if (reservation.status === 'CheckedIn') {
+                    actions +=
+                        '<button class="btn" onclick="checkOutReservation(' +
+                        id + ')">Check Out</button> ';
+                }
+            } else if (
+                currentUser.role === 'Member' &&
+                reservation.status === 'Confirmed'
+            ) {
+                actions +=
+                    '<button class="btn" onclick="editReservation(' +
+                    id + ')">Edit</button> ';
+            }
+
+            if (reservation.status === 'Confirmed') {
+                actions +=
+                    '<button class="btn" onclick="cancelReservation(' +
+                    id + ')">Cancel</button>';
+            }
+
+            var cells = [
+                reservation.reservation_id,
+                reservation.member_name || reservation.user_id,
+                reservation.seat_label || reservation.seat_id,
+                formatDate(reservation.start_time),
+                formatDate(reservation.end_time),
+                reservation.status,
+                actions || '-'
+            ];
+
+            cells.forEach(function (value, index) {
+                var cell = document.createElement('td');
+
+                if (index === 5) {
+                    cell.innerHTML = badge(value || 'Unknown');
+                } else if (index === 6) {
+                    cell.innerHTML = value;
+                } else {
+                    cell.textContent =
+                        value === null || value === undefined ? '-' : value;
+                }
+
+                row.appendChild(cell);
+            });
+
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        tbody.innerHTML =
+            '<tr><td colspan="7">' +
+            escapeHtml(error.message) +
+            '</td></tr>';
+    }
+}
+
+async function saveReservation(event) {
+    event.preventDefault();
+
+    try {
+        var reservationId =
+            document.getElementById('reservationId').value;
+
+        var data = {
+            seat_id: Number(document.getElementById('seatId').value),
+            start_time: document.getElementById('startTime').value,
+            end_time: document.getElementById('endTime').value
+        };
+
+        if (!data.seat_id || !data.start_time || !data.end_time) {
+            throw new Error('Please complete all reservation fields.');
+        }
+
+        if (new Date(data.end_time) <= new Date(data.start_time)) {
+            throw new Error('End time must be later than start time.');
+        }
+
+        if (isAdminOrStaffUser && !reservationId) {
+            data.user_id = Number(
+                document.getElementById('memberId').value
+            );
+
+            if (!data.user_id) {
+                throw new Error('Please select a member.');
+            }
+        }
+
+        var method = reservationId ? 'PUT' : 'POST';
+
+        var path = reservationId
+            ? '/reservations/' + reservationId
+            : '/reservations';
+
+        await callApi(path, method, data);
+
+        showMessage(
+            reservationId
+                ? 'Reservation updated successfully.'
+                : 'Reservation created successfully.',
+            false
+        );
+
+        resetForm();
+
+        await refreshPage();
+    } catch (error) {
+        showFormMessage(error.message, true);
+    }
+}
+
+function editReservation(id) {
+    var reservation = findById(
+        reservations,
+        'reservation_id',
+        id
+    );
+
+    if (!reservation) {
+        showMessage('Reservation not found.', true);
+        return;
+    }
+
+    document.getElementById('reservationId').value =
+        reservation.reservation_id;
+
+    document.getElementById('seatId').value =
+        reservation.seat_id;
+
+    document.getElementById('startTime').value =
+        dateToInput(new Date(reservation.start_time));
+
+    document.getElementById('endTime').value =
+        dateToInput(new Date(reservation.end_time));
+
+    document.getElementById('saveButton').textContent =
+        'Update Reservation';
+
+    document.getElementById('formTitle').textContent =
+        'Edit Reservation';
+
+    if (isAdminOrStaffUser) {
+        document.getElementById('memberId').disabled = true;
+    }
+
+    document.getElementById('reservationForm').scrollIntoView({
+        behavior: 'smooth'
+    });
+}
+
+async function checkInReservation(id) {
+    if (!confirm('Check in this reservation?')) {
+        return;
+    }
+
+    try {
+        await callApi(
+            '/reservations/' + id + '/check-in',
+            'POST'
+        );
+
+        showMessage('Reservation checked in successfully.', false);
+
+        await refreshPage();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function checkOutReservation(id) {
+    if (!confirm(
+        'Proceed with checkout? The system will calculate the session charge, apply eligible member passes, and record the payment.'
+    )) {
+        return;
+    }
+
+    try {
+        var result = await callApi(
+            '/reservations/' + id + '/check-out',
+            'POST'
+        );
+
+        if (!result || result.success !== true || !result.data) {
+            throw new Error('Checkout response was incomplete.');
+        }
+
+        displayReceipt(result.data);
+
+        showMessage(
+            'Checkout completed and payment recorded successfully.',
+            false
+        );
+
+        await refreshPage();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function cancelReservation(id) {
+    if (!confirm('Cancel this reservation?')) {
+        return;
+    }
+
+    try {
+        await callApi(
+            '/reservations/' + id,
+            'DELETE'
+        );
+
+        showMessage('Reservation cancelled successfully.', false);
+
+        await refreshPage();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+}
+
+async function refreshPage() {
+    await Promise.all([
+        loadSeats(),
+        loadReservations()
+    ]);
+}
+
+document.getElementById('reservationForm').addEventListener(
+    'submit',
+    saveReservation
+);
+
+currentUser = startPage('reservations.html');
+
+if (currentUser) {
+    isAdminOrStaffUser =
+        currentUser.role === 'Admin' ||
+        currentUser.role === 'Staff';
+
+    if (isAdminOrStaffUser) {
+        document.getElementById('memberField').style.display = 'block';
+    }
+
+    Promise.all([
+        loadSeats(),
+        loadReservations(),
+        loadMembers()
+    ]).catch(function (error) {
+        showError(error.message);
+    });
+}
+</script>
+</body>
+</html>
