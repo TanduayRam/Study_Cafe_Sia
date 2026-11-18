@@ -1,68 +1,63 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
 
 const reservationController = require('../controllers/reservationController');
-const checkoutController = require('../controllers/checkout_controller');
-
+ 
 const {
     authenticateToken,
-    authorizeRoles
+    isAdminOrStaff
 } = require('../middleware/auth_middleware');
 
-// View all reservations: Admin and Staff
+// All reservation routes require authentication.
+router.use(authenticateToken);
+
+// GET ALL RESERVATIONS
+// Admin and Staff see all.
+// Members see only their own reservations.
 router.get(
     '/',
-    authenticateToken,
-    authorizeRoles('admin', 'staff'),
-    reservationController.getAll
+    reservationController.getAll 
 );
 
-// View a specific reservation: Admin, Staff, and Customer
+// GET RESERVATION BY ID
+// Members can only access their own reservations.
 router.get(
     '/:id',
-    authenticateToken,
-    authorizeRoles('admin', 'staff', 'customer'),
-    reservationController.getById
+    reservationController.getById 
 );
 
-// Create a reservation
+// CREATE RESERVATION
 router.post(
     '/',
-    authenticateToken,
-    authorizeRoles('admin', 'staff', 'customer'),
-    reservationController.create
-);
+    reservationController.create 
+); 
 
-// Update a reservation: Admin and Customer
+// UPDATE RESERVATION
 router.put(
     '/:id',
-    authenticateToken,
-    authorizeRoles('admin', 'customer'),
-    reservationController.update
+    reservationController.update 
 );
 
-// Check in: Admin and Staff
+// CHECK IN RESERVATION
+// Admin and Staff only.
 router.post(
     '/:id/check-in',
-    authenticateToken,
-    authorizeRoles('admin', 'staff'),
+    isAdminOrStaff,
     reservationController.checkIn
 );
 
-// Billing-aware checkout: Admin and Staff
+// CHECK OUT RESERVATION
+// Admin and Staff only.
 router.post(
     '/:id/check-out',
-    authenticateToken,
-    authorizeRoles('admin', 'staff'),
-    checkoutController.checkoutReservation
+    isAdminOrStaff,
+    reservationController.checkOut
 );
 
-// Cancel: Admin and Customer
+// CANCEL RESERVATION
+// Ownership and reservation status are checked by the controller.
 router.delete(
     '/:id',
-    authenticateToken,
-    authorizeRoles('admin', 'member'),
-    reservationController.remove
+    reservationController.remove 
 );
-
-module.exports = router;
+ 
+module.exports = router; 
