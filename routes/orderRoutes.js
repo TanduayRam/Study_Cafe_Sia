@@ -5,39 +5,82 @@ const orderController = require('../controllers/orderController');
 
 const {
     authenticateToken,
-    authorizeRoles
+    isAdminOrStaff
 } = require('../middleware/auth_middleware');
 
-// View all orders: Admin and Staff
+// ===============================================================
+// VIEW ALL ORDERS
+// Admin and Staff only
+// ===============================================================
 router.get(
     '/',
     authenticateToken,
-    authorizeRoles('admin', 'staff'),
+    isAdminOrStaff,
     orderController.getAll
 );
 
-// View one order: Admin and Staff
+// ===============================================================
+// VIEW ONE ORDER
+// Admin and Staff only
+// ===============================================================
 router.get(
     '/:id',
     authenticateToken,
-    authorizeRoles('admin', 'staff'),
+    isAdminOrStaff,
     orderController.getById
 );
 
-// Create an order: Admin and Staff
+// ===============================================================
+// CREATE ORDER
+// Admin, Staff, and Member
+// Member ownership and CheckedIn reservation validation
+// are handled inside orderController.create.
+// ===============================================================
 router.post(
     '/',
     authenticateToken,
-    authorizeRoles('admin', 'staff'),
-    orderController.create
+    orderController.create 
 );
 
-// Update order status: Admin and Staff
+// ===============================================================
+// UPDATE ORDER STATUS
+// Admin and Staff only
+// ===============================================================
 router.patch(
     '/:id/status',
     authenticateToken,
-    authorizeRoles('admin', 'staff'),
+    isAdminOrStaff,
     orderController.updateStatus
 );
 
- module.exports = router;
+// ===============================================================
+// CONFIRM FOOD ORDER PAYMENT
+// Admin and Staff only
+// Only Served and Unpaid orders can be marked as Paid.
+// ===============================================================
+router.patch(
+    '/:id/payment',
+    authenticateToken,
+    isAdminOrStaff,
+    orderController.markAsPaid
+);
+
+// ===============================================================
+// TEMPORARY DIAGNOSTIC TEST
+// Tests whether a logged-in Member can access the order route.
+// Remove this endpoint after testing.
+// ===============================================================
+router.post(
+    '/test-member-access',
+    authenticateToken,
+    function (req, res) {
+        return res.json({
+            success: true,
+            message: 'Member route works.',
+            role: req.user.role,
+            user_id: req.user.user_id
+        });
+    }
+);
+
+module.exports = router;
