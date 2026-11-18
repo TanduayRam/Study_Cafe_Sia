@@ -23,7 +23,7 @@ function cleanRatingAndComment(body) {
 
 // Finds the review from the address. Throws 404 if it does not exist.
 async function loadReview(req) {
-    const review = await Review.getById(toId(req.params.id, 'Review ID'));
+    const review = await Review.getById(toId(req.params.id, 'Review ID'), req.user.user_id);
 
     if (!review) {
         throw createError(404, 'Review not found.');
@@ -33,7 +33,7 @@ async function loadReview(req) {
 
 // Only the person who wrote the review, or an Admin, may change or delete it.
 function checkCanChange(review, user) {
-    if (user.role !== 'Admin' && review.user_id !== user.user_id) {
+    if (user.role !== 'Admin' && Number(review.user_id) !== Number(user.user_id)) {
         throw createError(403, 'You can only change your own reviews.');
     }
 }
@@ -41,8 +41,19 @@ function checkCanChange(review, user) {
 // GET /reviews
 exports.getAll = async function (req, res, next) {
     try {
-        const reviews = await Review.getAll();
-        return sendSuccess(res, reviews, 'Reviews retrieved.');
+        const reviews = await Review.getAll(req.user.user_id);
+        const summary = await Review.getStats(req.user.user_id);
+        return sendSuccess(res, { reviews, summary }, 'Your reviews retrieved.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+// GET /reviews/eligible-reservations - completed reservations owned by the signed-in user.
+exports.getEligibleReservations = async function (req, res, next) {
+    try {
+        const reservations = await reservationModel.getCompletedByUser(req.user.user_id);
+        return sendSuccess(res, reservations, 'Completed reservations retrieved.');
     } catch (error) {
         next(error);
     }
@@ -71,7 +82,7 @@ exports.create = async function (req, res, next) {
         if (!reservation) {
             throw createError(404, 'Reservation not found.');
         }
-        if (req.user.role === 'Member' && reservation.user_id !== req.user.user_id) {
+        if (Number(reservation.user_id) !== Number(req.user.user_id)) {
             throw createError(403, 'You can only review your own reservations.');
         }
         if (reservation.status !== 'Completed') {
@@ -104,7 +115,7 @@ exports.update = async function (req, res, next) {
         checkCanChange(review, req.user);
 
         const clean = cleanRatingAndComment(req.body || {});
-        const updated = await Review.update(review.review_id, clean);
+        const updated = await Review.update(review.review_id, req.user.user_id, clean);
 
         return sendSuccess(res, updated, 'Review updated.');
     } catch (error) {
@@ -118,7 +129,7 @@ exports.remove = async function (req, res, next) {
         const review = await loadReview(req);
         checkCanChange(review, req.user);
 
-        await Review.remove(review.review_id);
+        await Review.remove(review.review_id, req.user.user_id);
         return sendSuccess(res, { review_id: review.review_id }, 'Review deleted.');
     } catch (error) {
         next(error);

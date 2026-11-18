@@ -1,6 +1,7 @@
 const db = require('../config/databases');
 const billingModel = require('./billing_model');
 const paymentModel = require('./payment_model');
+const sessionLogsModel = require('./session_logs_model');
 
 
 // Process checkout in one database transaction.
@@ -60,20 +61,21 @@ async function checkoutReservation(
         }
 
         // Create the payment within the same transaction.
-        const payment = await paymentModel.create({
+        const payment = await paymentModel.create(connection, {
             reservation_id: reservationId,
+            pass_hours_used: bill.pass_hours_used,
             pass_amount: bill.pass_amount,
             cash_amount: bill.cash_amount,
             total_amount: bill.total_amount,
             payment_method: paymentMethod
-        }, connection);
+        });
 
         // Mark the reservation as completed.
         await connection.query(
             `UPDATE reservations
-             SET status = 'Completed'
+             SET status = 'Completed', checked_out_at = ?
              WHERE reservation_id = ?`,
-            [reservationId]
+            [checkoutTime, reservationId]
         );
 
 
@@ -84,7 +86,7 @@ async function checkoutReservation(
              WHERE seat_id = ?`,
             [reservation.seat_id]
         );
-
+        await sessionLogsModel.endSession(connection, reservationId, checkoutTime);
 
         await connection.commit();
 
