@@ -82,7 +82,7 @@ exports.create = async function (req, res, next) {
     }
 };
 
-// PUT /seats/:id and PATCH /seats/:id
+// PUT /seats/:id
 exports.update = async function (req, res, next) {
     try {
         const id = toId(req.params.id, 'Seat ID');

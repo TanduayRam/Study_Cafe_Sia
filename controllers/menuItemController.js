@@ -7,9 +7,9 @@ function validateItem(body) {
     }
 
     const price = Number(body.price);
-    if (isBlank(body.price) || isNaN(price) || price <= 0) {
-        throw createError(400, 'Price must be a number above 0.');
-    }
+if (isBlank(body.price) || !Number.isFinite(price) || price <= 0) {
+    throw createError(400, 'Price must be a number above 0.');
+}
 
     const stock = Number(body.stock);
     if (isBlank(body.stock) || !Number.isInteger(stock) || stock < 0) {
