@@ -1,165 +1,443 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Study Cafe - Seats</title>
-<link rel="stylesheet" href="app.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seats - Study Cafe</title>
+    <link rel="stylesheet" href="app.css">
+
+    <style>
+        .seat-form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 18px;
+        }
+
+        .seat-form-grid .field {
+            margin-bottom: 0;
+        }
+
+        .seat-form-grid label {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .seat-form-grid input,
+        .seat-form-grid select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .seat-count {
+            font-size: 14px;
+            margin-top: 5px;
+            opacity: 0.75;
+        }
+
+        .actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 700px) {
+            .seat-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
+
 <body>
+
 <div class="shell">
-    <div class="sidebar" id="menu"></div>
-    <div class="main">
-        <div class="topbar">
+
+    <aside class="sidebar" id="menu"></aside>
+
+    <main class="main">
+
+        <header class="topbar">
             <h1>Seats</h1>
             <div class="who" id="who"></div>
-        </div>
-        <div id="banner"></div>
-        <div id="content">
-<div class="card" id="formCard">
-    <h2 id="formTitle">Add a seat</h2>
-    <div class="row">
-        <div><label>Study zone</label><select id="zoneSelect"></select></div>
-        <div><label>Seat label (e.g. Desk 7, Chess Board 3, Booth 6)</label><input id="labelInput"></div>
-        <div><label>Status</label>
-            <select id="statusSelect"><option>Available</option><option>Occupied</option><option>Maintenance</option></select>
-        </div>
-    </div>
-    <div style="margin-top:12px">
-        <button class="btn primary" onclick="saveSeat()">Save</button>
-        <button class="btn" onclick="clearForm()">Clear</button>
-    </div>
-</div>
+        </header>
 
-<div class="card">
-    <h2>Seats, tables and booths</h2>
-    <div class="tablewrap">
-        <table>
-            <thead><tr><th>ID</th><th>Label</th><th>Zone</th><th>Rate / hour</th><th>Status</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-        </table>
-    </div>
-</div>
-        </div>
-    </div>
+        <div id="banner"></div>
+
+        <section id="content">
+
+            <!-- SEAT FORM -->
+            <div class="card" id="formCard">
+
+                <div class="toolbar">
+                    <div>
+                        <h2 id="formTitle">Add a Seat</h2>
+                        <p>Create a new seat or update an existing one.</p>
+                    </div>
+                </div>
+
+                <div class="seat-form-grid">
+
+                    <div class="field">
+                        <label for="zoneSelect">Study Zone</label>
+                        <select id="zoneSelect">
+                            <option value="">Select a study zone</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="labelInput">Seat Label</label>
+                        <input
+                            type="text"
+                            id="labelInput"
+                            placeholder="Example: Desk 7"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="statusSelect">Status</label>
+                        <select id="statusSelect">
+                            <option value="Available">Available</option>
+                            <option value="Occupied">Occupied</option>
+                            <option value="Maintenance">Maintenance</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        type="button"
+                        class="btn primary"
+                        id="saveButton"
+                        onclick="saveSeat()"
+                    >
+                        Save Seat
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn"
+                        onclick="clearForm()"
+                    >
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- SEAT LIST -->
+            <div class="card">
+
+                <div class="toolbar">
+                    <div>
+                        <h2>Seats, Tables and Booths</h2>
+                        <p>Manage the seating spaces available in your study cafe.</p>
+                        <div class="seat-count" id="seatCount">
+                            Loading seats...
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="btn"
+                        onclick="loadSeats()"
+                    >
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="tablewrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Seat ID</th>
+                                <th>Label</th>
+                                <th>Study Zone</th>
+                                <th>Rate / Hour</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="rows">
+                            <tr>
+                                <td colspan="6" class="empty">
+                                    Loading seats...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
 </div>
 
 <script src="api.js"></script>
+
 <script>
-var seats = [];
-var editingId = null;
-var role = '';
+    var seats = [];
+    var editingId = null;
+    var role = '';
 
-// Fill the Zone dropdown.
-async function loadZoneChoices() {
-    var result = await callApi('/study-zones');
-    var html = '';
-    for (var i = 0; i < result.data.length; i++) {
-        html = html + '<option value="' + result.data[i].zone_id + '">' + escapeHtml(result.data[i].name) + '</option>';
-    }
-    document.getElementById('zoneSelect').innerHTML = html;
-}
+    // Load available study zones.
+    async function loadZoneChoices() {
+        try {
+            var result = await callApi('/study-zones');
 
-async function loadSeats() {
-    try {
-        showLoading();
-        var result = await callApi('/seats');
-        seats = result.data;
+            var zones = Array.isArray(result.data)
+                ? result.data
+                : [];
 
-        var html = '';
-        for (var i = 0; i < seats.length; i++) {
-            var s = seats[i];
-            var buttons = '';
-            if (role === 'Admin' || role === 'Staff') {
-                buttons = '<button class="btn small" onclick="editSeat(' + s.seat_id + ')">Edit</button> ';
+            var html = '<option value="">Select a study zone</option>';
+
+            for (var i = 0; i < zones.length; i++) {
+                html +=
+                    '<option value="' + zones[i].zone_id + '">' +
+                    escapeHtml(zones[i].name) +
+                    '</option>';
             }
-            if (role === 'Admin') {
-                buttons = buttons + '<button class="btn small danger" onclick="deleteSeat(' + s.seat_id + ')">Delete</button>';
+
+            document.getElementById('zoneSelect').innerHTML = html;
+
+            if (zones.length === 0) {
+                showError('No study zones are available. Please create a study zone first.');
             }
-            html = html + '<tr>' +
-                '<td>' + s.seat_id + '</td>' +
-                '<td>' + escapeHtml(s.label) + '</td>' +
-                '<td>' + escapeHtml(s.zone_name) + '</td>' +
-                '<td>' + formatMoney(s.hourly_rate) + '</td>' +
-                '<td>' + badge(s.status) + '</td>' +
-                '<td class="actions">' + buttons + '</td></tr>';
+
+        } catch (error) {
+            showError(error.message);
         }
-        if (seats.length === 0) {
-            html = '<tr><td colspan="6" class="empty">No seats found.</td></tr>';
-        }
-        document.getElementById('rows').innerHTML = html;
-        hideBanner();
-    } catch (error) {
-        showError(error.message);
     }
-}
 
-function clearForm() {
-    editingId = null;
-    document.getElementById('formTitle').textContent = 'Add a seat';
-    document.getElementById('labelInput').value = '';
-    document.getElementById('statusSelect').value = 'Available';
-}
-
-function editSeat(id) {
-    var s = findById(seats, 'seat_id', id);
-    editingId = id;
-    document.getElementById('formTitle').textContent = 'Edit seat #' + id;
-    document.getElementById('zoneSelect').value = s.zone_id;
-    document.getElementById('labelInput').value = s.label;
-    document.getElementById('statusSelect').value = s.status;
-    window.scrollTo(0, 0);
-}
-
-// Save = POST (new seat) or PUT (existing seat).
-async function saveSeat() {
-    try {
-        var body = {
-            zone_id: document.getElementById('zoneSelect').value,
-            label: document.getElementById('labelInput').value,
-            status: document.getElementById('statusSelect').value
-        };
-
-        var result;
-        if (editingId === null) {
-            result = await callApi('/seats', 'POST', body);
-        } else {
-            result = await callApi('/seats/' + editingId, 'PUT', body);
+    // Return a status badge.
+    function seatBadge(status) {
+        if (status === 'Available') {
+            return '<span class="badge b-green">Available</span>';
         }
 
-        showMessage(result.message, false);
-        clearForm();
-        loadSeats();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
+        if (status === 'Occupied') {
+            return '<span class="badge b-yellow">Occupied</span>';
+        }
 
-async function deleteSeat(id) {
-    if (confirm('Delete this seat?') === false) {
-        return;
-    }
-    try {
-        var result = await callApi('/seats/' + id, 'DELETE');
-        showMessage(result.message, false);
-        loadSeats();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-}
+        if (status === 'Maintenance') {
+            return '<span class="badge b-red">Maintenance</span>';
+        }
 
-// ---- start the page ----
-var currentUser = startPage('seats.html');
-if (currentUser) {
-    role = currentUser.role;
-    if (role === 'Member') {
-        document.getElementById('formCard').style.display = 'none';
+        return '<span class="badge">' + escapeHtml(status) + '</span>';
     }
-    // Staff can edit a seat but only an Admin can add a new one.
-    loadZoneChoices().then(function () {
-        loadSeats();
-    });
-}
+
+    // Load and display all seats.
+    async function loadSeats() {
+        try {
+            showLoading();
+
+            var result = await callApi('/seats');
+
+            seats = Array.isArray(result.data)
+                ? result.data
+                : [];
+
+            var html = '';
+
+            for (var i = 0; i < seats.length; i++) {
+                var s = seats[i];
+                var buttons = '';
+
+                if (role === 'Admin' || role === 'Staff') {
+                    buttons =
+                        '<button class="btn small" onclick="editSeat(' +
+                        s.seat_id +
+                        ')">Edit</button> ';
+                }
+
+                if (role === 'Admin') {
+                    buttons +=
+                        '<button class="btn small danger" onclick="deleteSeat(' +
+                        s.seat_id +
+                        ')">Delete</button>';
+                }
+
+                html +=
+                    '<tr>' +
+                        '<td>#' + s.seat_id + '</td>' +
+                        '<td>' + escapeHtml(s.label) + '</td>' +
+                        '<td>' + escapeHtml(s.zone_name) + '</td>' +
+                        '<td>' + formatMoney(s.hourly_rate) + '</td>' +
+                        '<td>' + seatBadge(s.status) + '</td>' +
+                        '<td class="actions">' + buttons + '</td>' +
+                    '</tr>';
+            }
+
+            if (seats.length === 0) {
+                html =
+                    '<tr><td colspan="6" class="empty">' +
+                    'No seats found.' +
+                    '</td></tr>';
+            }
+
+            document.getElementById('rows').innerHTML = html;
+
+            document.getElementById('seatCount').textContent =
+                'Total seats: ' + seats.length;
+
+            hideBanner();
+
+        } catch (error) {
+            showError(error.message);
+
+            document.getElementById('rows').innerHTML =
+                '<tr><td colspan="6" class="empty">' +
+                escapeHtml(error.message) +
+                '</td></tr>';
+
+            document.getElementById('seatCount').textContent =
+                'Unable to load seats.';
+        }
+    }
+
+    // Reset the form.
+    function clearForm() {
+        editingId = null;
+
+        document.getElementById('formTitle').textContent = 'Add a Seat';
+        document.getElementById('labelInput').value = '';
+        document.getElementById('statusSelect').value = 'Available';
+        document.getElementById('zoneSelect').value = '';
+
+        var saveButton = document.getElementById('saveButton');
+
+        saveButton.textContent = 'Save Seat';
+    }
+
+    // Load an existing seat into the form.
+    function editSeat(id) {
+        var s = findById(seats, 'seat_id', id);
+
+        if (!s) {
+            showError('Seat not found.');
+            return;
+        }
+
+        editingId = id;
+
+        document.getElementById('formTitle').textContent =
+            'Edit Seat #' + id;
+
+        document.getElementById('zoneSelect').value = s.zone_id;
+        document.getElementById('labelInput').value = s.label;
+        document.getElementById('statusSelect').value = s.status;
+
+        document.getElementById('saveButton').textContent =
+            'Update Seat';
+
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+
+    // Save a new seat or update an existing seat.
+    async function saveSeat() {
+        try {
+            var zoneId = document.getElementById('zoneSelect').value;
+            var label = document.getElementById('labelInput').value.trim();
+            var status = document.getElementById('statusSelect').value;
+
+            if (!zoneId) {
+                throw new Error('Please select a study zone.');
+            }
+
+            if (!label) {
+                throw new Error('Please enter a seat label.');
+            }
+
+            // Staff can edit seats but cannot create new ones.
+            if (editingId === null && role !== 'Admin') {
+                throw new Error('Only Admin can add new seats.');
+            }
+
+            var body = {
+                zone_id: zoneId,
+                label: label,
+                status: status
+            };
+
+            var result;
+
+            if (editingId === null) {
+                result = await callApi('/seats', 'POST', body);
+            } else {
+                result = await callApi(
+                    '/seats/' + editingId,
+                    'PUT',
+                    body
+                );
+            }
+
+            showMessage(result.message, false);
+
+            clearForm();
+
+            await loadSeats();
+
+        } catch (error) {
+            showMessage(error.message, true);
+        }
+    }
+
+    // Delete a seat.
+    async function deleteSeat(id) {
+        if (!confirm('Are you sure you want to delete this seat?')) {
+            return;
+        }
+
+        try {
+            var result = await callApi(
+                '/seats/' + id,
+                'DELETE'
+            );
+
+            showMessage(result.message, false);
+
+            await loadSeats();
+
+        } catch (error) {
+            showMessage(error.message, true);
+        }
+    }
+
+    // Initialize the page.
+    var currentUser = startPage('seats.html');
+
+    if (currentUser) {
+        role = currentUser.role;
+
+        if (role === 'Member') {
+            document.getElementById('formCard').style.display = 'none';
+        }
+
+        if (role === 'Staff') {
+            document.getElementById('formTitle').textContent = 'Edit a Seat';
+        }
+
+        loadZoneChoices().then(function () {
+            loadSeats();
+        });
+    }
+
 </script>
+
 </body>
 </html>

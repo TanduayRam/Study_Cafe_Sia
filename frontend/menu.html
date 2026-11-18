@@ -1,167 +1,1349 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Study Cafe - Menu</title>
-<link rel="stylesheet" href="app.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Study Cafe - Menu</title>
+    <link rel="stylesheet" href="app.css">
 </head>
+
 <body>
+
 <div class="shell">
+
     <div class="sidebar" id="menu"></div>
+
     <div class="main">
+
         <div class="topbar">
             <h1>Menu</h1>
             <div class="who" id="who"></div>
         </div>
+
         <div id="banner"></div>
+
         <div id="content">
-<div class="card" id="formCard">
-    <h2 id="formTitle">Add a menu item</h2>
-    <div class="row">
-        <div><label>Item name</label><input id="nameInput"></div>
-        <div><label>Category</label><input id="categoryInput"></div>
-        <div><label>Price (pesos)</label><input id="priceInput" type="number" step="any"></div>
-        <div><label>Stock</label><input id="stockInput" type="number"></div>
-        <div><label>Reorder level</label><input id="reorderInput" type="number" value="5"></div>
+
+            <!-- ================================================= -->
+            <!-- ADMIN AND STAFF: MENU MANAGEMENT FORM             -->
+            <!-- ================================================= -->
+
+            <div class="card" id="formCard">
+
+                <h2 id="formTitle">Add a menu item</h2>
+
+                <div class="row">
+
+                    <div>
+                        <label for="nameInput">Item name</label>
+                        <input
+                            id="nameInput"
+                            type="text"
+                            maxlength="100"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="categoryInput">Category</label>
+                        <input
+                            id="categoryInput"
+                            type="text"
+                            maxlength="50"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="priceInput">Price (pesos)</label>
+                        <input
+                            id="priceInput"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="stockInput">Stock</label>
+                        <input
+                            id="stockInput"
+                            type="number"
+                            min="0"
+                            step="1"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="reorderInput">Reorder level</label>
+                        <input
+                            id="reorderInput"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value="5"
+                        >
+                    </div>
+
+                </div>
+
+                <div style="margin-top:12px">
+
+                    <button
+                        class="btn primary"
+                        onclick="saveItem()"
+                    >
+                        Save
+                    </button>
+
+                    <button
+                        class="btn"
+                        onclick="clearForm()"
+                    >
+                        Clear
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- MEMBER: ORDERING INFORMATION                      -->
+            <!-- ================================================= -->
+
+            <div class="card" id="memberInfo" style="display:none">
+
+                <h2>Place Your Order</h2>
+
+                <p>
+                    Browse the available menu items below and add
+                    your selections to your cart.
+                </p>
+
+                <p>
+                    You must have a checked-in reservation to place
+                    an order.
+                </p>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- MEMBER: RESERVATION SELECTOR                      -->
+            <!-- ================================================= -->
+
+            <div class="card" id="reservationCard" style="display:none">
+
+                <h2>Your Checked-In Reservation</h2>
+
+                <label for="reservationSelect">
+                    Select the reservation for this order
+                </label>
+
+                <select id="reservationSelect">
+                    <option value="">Loading reservations...</option>
+                </select>
+
+                <div
+                    id="reservationMessage"
+                    style="margin-top:10px"
+                ></div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- MENU ITEMS TABLE                                  -->
+            <!-- ================================================= -->
+
+            <div class="card">
+
+                <h2>Food, drinks and supplies</h2>
+
+                <div class="tablewrap">
+
+                    <table>
+
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Reorder at</th>
+                                <th>Stock status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="rows">
+                            <tr>
+                                <td colspan="8" class="empty">
+                                    Loading menu items...
+                                </td>
+                            </tr>
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- MEMBER: SHOPPING CART                             -->
+            <!-- ================================================= -->
+
+            <div class="card" id="cartCard" style="display:none">
+
+                <h2>Your Cart</h2>
+
+                <div class="tablewrap">
+
+                    <table>
+
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                                <th>Subtotal</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="cartRows">
+                            <tr>
+                                <td colspan="5" class="empty">
+                                    Your cart is empty.
+                                </td>
+                            </tr>
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+                <div style="margin-top:15px">
+
+                    <h3>
+                        Total:
+                        <span id="cartTotal">₱0.00</span>
+                    </h3>
+
+                    <button
+                        class="btn primary"
+                        id="placeOrderButton"
+                        onclick="placeOrder()"
+                    >
+                        Place Order
+                    </button>
+
+                    <button
+                        class="btn"
+                        onclick="clearCart()"
+                    >
+                        Clear Cart
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- MEMBER: ORDER CONFIRMATION                        -->
+            <!-- ================================================= -->
+
+            <div
+                class="card"
+                id="orderConfirmation"
+                style="display:none"
+            >
+
+                <h2>Order Placed Successfully!</h2>
+
+                <div id="confirmationDetails"></div>
+
+            </div>
+
+        </div>
+
     </div>
-    <div style="margin-top:12px">
-        <button class="btn primary" onclick="saveItem()">Save</button>
-        <button class="btn" onclick="clearForm()">Clear</button>
-    </div>
+
 </div>
 
-<div class="card">
-    <h2>Food, drinks and supplies</h2>
-    <div class="tablewrap">
-        <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Reorder at</th><th>Stock status</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-        </table>
-    </div>
-</div>
-        </div>
-    </div>
-</div>
 
 <script src="api.js"></script>
+
 <script>
+
 var items = [];
 var editingId = null;
 var role = '';
 
-async function loadItems() {
-    try {
-        showLoading();
-        var result = await callApi('/menu-items');
-        items = result.data;
+var cart = [];
+var reservations = [];
 
-        var html = '';
-        for (var i = 0; i < items.length; i++) {
-            var m = items[i];
 
-            var stockStatus = '<span class="badge b-green">OK</span>';
-            if (m.low_stock) {
-                stockStatus = '<span class="badge b-red">Low stock</span>';
-            }
+// =============================================================
+// GENERAL HELPERS
+// =============================================================
 
-            var buttons = '';
-            if (role === 'Admin' || role === 'Staff') {
-                buttons = '<button class="btn small" onclick="editItem(' + m.item_id + ')">Edit</button> ';
-            }
-            if (role === 'Admin') {
-                buttons = buttons + '<button class="btn small danger" onclick="deleteItem(' + m.item_id + ')">Delete</button>';
-            }
-
-            html = html + '<tr>' +
-                '<td>' + m.item_id + '</td>' +
-                '<td>' + escapeHtml(m.name) + '</td>' +
-                '<td>' + escapeHtml(m.category) + '</td>' +
-                '<td>' + formatMoney(m.price) + '</td>' +
-                '<td>' + m.stock + '</td>' +
-                '<td>' + m.reorder_level + '</td>' +
-                '<td>' + stockStatus + '</td>' +
-                '<td class="actions">' + buttons + '</td></tr>';
-        }
-        if (items.length === 0) {
-            html = '<tr><td colspan="8" class="empty">No menu items found.</td></tr>';
-        }
-        document.getElementById('rows').innerHTML = html;
-        hideBanner();
-    } catch (error) {
-        showError(error.message);
-    }
+function escapeText(value) {
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
+
+
+function getMenuItem(id) {
+    return items.find(function (item) {
+        return Number(item.item_id) === Number(id);
+    });
+}
+
+
+function getCartItem(id) {
+    return cart.find(function (item) {
+        return Number(item.menu_item_id) === Number(id);
+    });
+}
+
+
+function isManager() {
+    return role === 'Admin' || role === 'Staff';
+}
+
+
+function isMember() {
+    return role === 'Member';
+}
+
+
+// =============================================================
+// LOAD MENU ITEMS
+// =============================================================
+
+async function loadItems() {
+
+    try {
+
+        var result = await callApi('/menu-items');
+
+        items = result.data || [];
+
+        renderMenuItems();
+
+        hideBanner();
+
+    } catch (error) {
+
+        showError(error.message);
+
+    }
+
+}
+
+
+// =============================================================
+// RENDER MENU ITEMS
+// =============================================================
+
+function renderMenuItems() {
+
+    var html = '';
+
+    for (var i = 0; i < items.length; i++) {
+
+        var m = items[i];
+
+        var stockStatus =
+            '<span class="badge b-green">OK</span>';
+
+        if (m.low_stock) {
+
+            stockStatus =
+                '<span class="badge b-red">Low stock</span>';
+
+        }
+
+        if (Number(m.stock) <= 0) {
+
+            stockStatus =
+                '<span class="badge b-red">Out of stock</span>';
+
+        }
+
+        var buttons = '';
+
+        // Admin and Staff menu management.
+        if (isManager()) {
+
+            buttons +=
+                '<button class="btn small" onclick="editItem(' +
+                Number(m.item_id) +
+                ')">Edit</button> ';
+
+        }
+
+        if (role === 'Admin') {
+
+            buttons +=
+                '<button class="btn small danger" onclick="deleteItem(' +
+                Number(m.item_id) +
+                ')">Delete</button>';
+
+        }
+
+        // Member ordering.
+        if (isMember()) {
+
+            if (Number(m.stock) > 0) {
+
+                buttons +=
+                    '<input ' +
+                    'type="number" ' +
+                    'min="1" ' +
+                    'max="' + Number(m.stock) + '" ' +
+                    'value="1" ' +
+                    'id="quantity_' + Number(m.item_id) + '" ' +
+                    'style="width:65px;margin-right:5px" ' +
+                    'aria-label="Quantity for ' +
+                    escapeText(m.name) +
+                    '">';
+
+                buttons +=
+                    '<button class="btn small primary" ' +
+                    'onclick="addToCart(' +
+                    Number(m.item_id) +
+                    ')">Add to Cart</button>';
+
+            } else {
+
+                buttons =
+                    '<span class="badge b-red">Unavailable</span>';
+
+            }
+
+        }
+
+        html +=
+            '<tr>' +
+
+                '<td>' +
+                    Number(m.item_id) +
+                '</td>' +
+
+                '<td>' +
+                    escapeText(m.name) +
+                '</td>' +
+
+                '<td>' +
+                    escapeText(m.category) +
+                '</td>' +
+
+                '<td>' +
+                    formatMoney(m.price) +
+                '</td>' +
+
+                '<td>' +
+                    Number(m.stock) +
+                '</td>' +
+
+                '<td>' +
+                    Number(m.reorder_level) +
+                '</td>' +
+
+                '<td>' +
+                    stockStatus +
+                '</td>' +
+
+                '<td class="actions">' +
+                    buttons +
+                '</td>' +
+
+            '</tr>';
+
+    }
+
+    if (items.length === 0) {
+
+        html =
+            '<tr>' +
+                '<td colspan="8" class="empty">' +
+                    'No menu items found.' +
+                '</td>' +
+            '</tr>';
+
+    }
+
+    document.getElementById('rows').innerHTML = html;
+
+}
+
+
+// =============================================================
+// MEMBER: LOAD OWN CHECKED-IN RESERVATIONS
+// =============================================================
+
+async function loadMemberReservations() {
+
+    var select = document.getElementById('reservationSelect');
+
+    var message = document.getElementById('reservationMessage');
+
+    try {
+
+        select.innerHTML =
+            '<option value="">Loading reservations...</option>';
+
+        var result = await callApi(
+            '/reservations?status=CheckedIn'
+        );
+
+        reservations = result.data || [];
+
+        select.innerHTML =
+            '<option value="">Select a reservation</option>';
+
+        if (reservations.length === 0) {
+
+            select.innerHTML =
+                '<option value="">No checked-in reservations available</option>';
+
+            message.innerHTML =
+                '<span class="badge b-red">' +
+                'You need an active checked-in reservation to place an order.' +
+                '</span>';
+
+            document.getElementById('placeOrderButton').disabled = true;
+
+            return;
+
+        }
+
+        for (var i = 0; i < reservations.length; i++) {
+
+            var r = reservations[i];
+
+            var option = document.createElement('option');
+
+            option.value = r.reservation_id;
+
+            var description =
+                'Reservation #' + r.reservation_id;
+
+            if (r.seat_label) {
+
+                description += ' - Seat ' + r.seat_label;
+
+            }
+
+            if (r.zone_name) {
+
+                description += ' (' + r.zone_name + ')';
+
+            }
+
+            option.textContent = description;
+
+            select.appendChild(option);
+
+        }
+
+        message.innerHTML =
+            '<span class="badge b-green">' +
+            reservations.length +
+            ' checked-in reservation(s) available.' +
+            '</span>';
+
+    } catch (error) {
+
+        select.innerHTML =
+            '<option value="">Unable to load reservations</option>';
+
+        message.innerHTML =
+            '<span class="badge b-red">' +
+            escapeText(error.message) +
+            '</span>';
+
+    }
+
+}
+
+
+// =============================================================
+// ADMIN AND STAFF: MENU MANAGEMENT
+// =============================================================
 
 function clearForm() {
+
     editingId = null;
-    document.getElementById('formTitle').textContent = 'Add a menu item';
+
+    document.getElementById('formTitle').textContent =
+        'Add a menu item';
+
     document.getElementById('nameInput').value = '';
+
     document.getElementById('categoryInput').value = '';
+
     document.getElementById('priceInput').value = '';
+
     document.getElementById('stockInput').value = '';
+
     document.getElementById('reorderInput').value = '5';
+
 }
+
 
 function editItem(id) {
-    var m = findById(items, 'item_id', id);
+
+    if (!isManager()) {
+
+        showMessage(
+            'You do not have permission to edit menu items.',
+            true
+        );
+
+        return;
+
+    }
+
+    var m = getMenuItem(id);
+
+    if (!m) {
+
+        showMessage(
+            'Menu item not found. Please refresh the list.',
+            true
+        );
+
+        return;
+
+    }
+
     editingId = id;
-    document.getElementById('formTitle').textContent = 'Edit menu item #' + id;
+
+    document.getElementById('formTitle').textContent =
+        'Edit menu item #' + id;
+
     document.getElementById('nameInput').value = m.name;
+
     document.getElementById('categoryInput').value = m.category;
+
     document.getElementById('priceInput').value = m.price;
+
     document.getElementById('stockInput').value = m.stock;
+
     document.getElementById('reorderInput').value = m.reorder_level;
+
     window.scrollTo(0, 0);
+
 }
+
 
 async function saveItem() {
+
+    if (!isManager()) {
+
+        showMessage(
+            'You do not have permission to manage menu items.',
+            true
+        );
+
+        return;
+
+    }
+
     try {
+
         var body = {
-            name: document.getElementById('nameInput').value,
-            category: document.getElementById('categoryInput').value,
+
+            name: document.getElementById('nameInput').value.trim(),
+
+            category: document.getElementById('categoryInput').value.trim(),
+
             price: document.getElementById('priceInput').value,
+
             stock: document.getElementById('stockInput').value,
+
             reorder_level: document.getElementById('reorderInput').value
+
         };
 
-        var result;
-        if (editingId === null) {
-            result = await callApi('/menu-items', 'POST', body);
-        } else {
-            result = await callApi('/menu-items/' + editingId, 'PUT', body);
+        if (
+            !body.name ||
+            !body.category ||
+            body.price === '' ||
+            body.stock === '' ||
+            body.reorder_level === ''
+        ) {
+
+            showMessage(
+                'Please complete all menu item fields.',
+                true
+            );
+
+            return;
+
         }
 
-        showMessage(result.message, false);
+        var price = Number(body.price);
+
+        var stock = Number(body.stock);
+
+        var reorderLevel = Number(body.reorder_level);
+
+        if (!Number.isFinite(price) || price <= 0) {
+
+            showMessage('Enter a valid price.', true);
+
+            return;
+
+        }
+
+        if (
+            !Number.isSafeInteger(stock) ||
+            stock < 0
+        ) {
+
+            showMessage(
+                'Stock must be a non-negative whole number.',
+                true
+            );
+
+            return;
+
+        }
+
+        if (
+            !Number.isSafeInteger(reorderLevel) ||
+            reorderLevel < 0
+        ) {
+
+            showMessage(
+                'Reorder level must be a non-negative whole number.',
+                true
+            );
+
+            return;
+
+        }
+
+        var result;
+
+        if (editingId === null) {
+
+            result = await callApi(
+                '/menu-items',
+                'POST',
+                body
+            );
+
+        } else {
+
+            result = await callApi(
+                '/menu-items/' + editingId,
+                'PUT',
+                body
+            );
+
+        }
+
         clearForm();
-        loadItems();
+
+        await loadItems();
+
+        showMessage(
+            result.message || 'Menu item saved successfully.',
+            false
+        );
+
     } catch (error) {
+
         showMessage(error.message, true);
+
     }
+
 }
+
 
 async function deleteItem(id) {
-    if (confirm('Delete this menu item?') === false) {
+
+    if (role !== 'Admin') {
+
+        showMessage(
+            'Only Admins can delete menu items.',
+            true
+        );
+
         return;
+
     }
+
+    if (!confirm('Delete this menu item?')) {
+
+        return;
+
+    }
+
     try {
-        var result = await callApi('/menu-items/' + id, 'DELETE');
-        showMessage(result.message, false);
-        loadItems();
+
+        var result = await callApi(
+            '/menu-items/' + id,
+            'DELETE'
+        );
+
+        if (editingId === id) {
+
+            clearForm();
+
+        }
+
+        await loadItems();
+
+        showMessage(
+            result.message || 'Menu item deleted successfully.',
+            false
+        );
+
     } catch (error) {
+
         showMessage(error.message, true);
+
     }
+
 }
 
-// ---- start the page ----
-var currentUser = startPage('menu.html');
-if (currentUser) {
-    role = currentUser.role;
-    if (role === 'Member') {
-        document.getElementById('formCard').style.display = 'none';
+
+// =============================================================
+// MEMBER: ADD ITEMS TO CART
+// =============================================================
+
+function addToCart(id) {
+
+    if (!isMember()) {
+
+        showMessage(
+            'Only Members can use the ordering cart.',
+            true
+        );
+
+        return;
+
     }
-    loadItems();
+
+    var menuItem = getMenuItem(id);
+
+    if (!menuItem) {
+
+        showMessage('Menu item not found.', true);
+
+        return;
+
+    }
+
+    var quantityInput = document.getElementById(
+        'quantity_' + id
+    );
+
+    var quantity = Number(quantityInput.value);
+
+    if (
+        !Number.isSafeInteger(quantity) ||
+        quantity <= 0
+    ) {
+
+        showMessage(
+            'Please enter a valid quantity.',
+            true
+        );
+
+        return;
+
+    }
+
+    if (quantity > Number(menuItem.stock)) {
+
+        showMessage(
+            'Requested quantity exceeds available stock.',
+            true
+        );
+
+        return;
+
+    }
+
+    var existing = getCartItem(id);
+
+    if (existing) {
+
+        var newQuantity = existing.quantity + quantity;
+
+        if (newQuantity > Number(menuItem.stock)) {
+
+            showMessage(
+                'Your cart quantity exceeds available stock.',
+                true
+            );
+
+            return;
+
+        }
+
+        existing.quantity = newQuantity;
+
+    } else {
+
+        cart.push({
+
+            menu_item_id: Number(menuItem.item_id),
+
+            name: menuItem.name,
+
+            price: Number(menuItem.price),
+
+            quantity: quantity
+
+        });
+
+    }
+
+    renderCart();
+
+    showMessage(
+        menuItem.name + ' added to your cart.',
+        false
+    );
+
 }
+
+
+// =============================================================
+// MEMBER: RENDER CART
+// =============================================================
+
+function renderCart() {
+
+    var html = '';
+
+    var total = 0;
+
+    for (var i = 0; i < cart.length; i++) {
+
+        var item = cart[i];
+
+        var subtotal = item.price * item.quantity;
+
+        total += subtotal;
+
+        html +=
+
+            '<tr>' +
+
+                '<td>' +
+                    escapeText(item.name) +
+                '</td>' +
+
+                '<td>' +
+                    formatMoney(item.price) +
+                '</td>' +
+
+                '<td>' +
+
+                    '<input ' +
+                    'type="number" ' +
+                    'min="1" ' +
+                    'value="' + item.quantity + '" ' +
+                    'style="width:70px" ' +
+                    'onchange="changeCartQuantity(' +
+                        item.menu_item_id +
+                    ', this.value)">' +
+
+                '</td>' +
+
+                '<td>' +
+                    formatMoney(subtotal) +
+                '</td>' +
+
+                '<td>' +
+
+                    '<button ' +
+                    'class="btn small danger" ' +
+                    'onclick="removeFromCart(' +
+                        item.menu_item_id +
+                    ')">' +
+                    'Remove' +
+                    '</button>' +
+
+                '</td>' +
+
+            '</tr>';
+
+    }
+
+    if (cart.length === 0) {
+
+        html =
+            '<tr>' +
+                '<td colspan="5" class="empty">' +
+                    'Your cart is empty.' +
+                '</td>' +
+            '</tr>';
+
+    }
+
+    document.getElementById('cartRows').innerHTML = html;
+
+    document.getElementById('cartTotal').textContent =
+        formatMoney(total);
+
+    document.getElementById('placeOrderButton').disabled =
+        cart.length === 0 ||
+        reservations.length === 0;
+
+}
+
+
+function changeCartQuantity(id, value) {
+
+    var item = getCartItem(id);
+
+    var menuItem = getMenuItem(id);
+
+    if (!item || !menuItem) {
+
+        return;
+
+    }
+
+    var quantity = Number(value);
+
+    if (
+        !Number.isSafeInteger(quantity) ||
+        quantity <= 0
+    ) {
+
+        showMessage(
+            'Quantity must be a positive whole number.',
+            true
+        );
+
+        renderCart();
+
+        return;
+
+    }
+
+    if (quantity > Number(menuItem.stock)) {
+
+        showMessage(
+            'Requested quantity exceeds available stock.',
+            true
+        );
+
+        renderCart();
+
+        return;
+
+    }
+
+    item.quantity = quantity;
+
+    renderCart();
+
+}
+
+
+function removeFromCart(id) {
+
+    cart = cart.filter(function (item) {
+
+        return Number(item.menu_item_id) !== Number(id);
+
+    });
+
+    renderCart();
+
+    showMessage('Item removed from your cart.', false);
+
+}
+
+
+function clearCart() {
+
+    if (cart.length === 0) {
+
+        return;
+
+    }
+
+    if (!confirm('Clear all items from your cart?')) {
+
+        return;
+
+    }
+
+    cart = [];
+
+    renderCart();
+
+    showMessage('Your cart has been cleared.', false);
+
+}
+
+
+// =============================================================
+// MEMBER: PLACE ORDER
+// =============================================================
+
+async function placeOrder() {
+
+    if (!isMember()) {
+
+        showMessage(
+            'You do not have permission to place orders here.',
+            true
+        );
+
+        return;
+
+    }
+
+    if (cart.length === 0) {
+
+        showMessage(
+            'Please add at least one item to your cart.',
+            true
+        );
+
+        return;
+
+    }
+
+    var reservationId = document.getElementById(
+        'reservationSelect'
+    ).value;
+
+    if (!reservationId) {
+
+        showMessage(
+            'Please select your checked-in reservation.',
+            true
+        );
+
+        return;
+
+    }
+
+    // Verify that the selected reservation belongs to
+    // the reservations loaded for this Member.
+    var selectedReservation = reservations.find(function (reservation) {
+
+        return String(reservation.reservation_id) ===
+            String(reservationId);
+
+    });
+
+    if (!selectedReservation) {
+
+        showMessage(
+            'Invalid reservation selection.',
+            true
+        );
+
+        return;
+
+    }
+
+    // Recheck quantities against the latest loaded menu stock.
+    for (var i = 0; i < cart.length; i++) {
+
+        var cartItem = cart[i];
+
+        var menuItem = getMenuItem(cartItem.menu_item_id);
+
+        if (!menuItem) {
+
+            showMessage(
+                'A menu item in your cart is no longer available.',
+                true
+            );
+
+            return;
+
+        }
+
+        if (cartItem.quantity > Number(menuItem.stock)) {
+
+            showMessage(
+                'Insufficient stock for ' + menuItem.name + '.',
+                true
+            );
+
+            return;
+
+        }
+
+    }
+
+    if (!confirm('Place this order now?')) {
+
+        return;
+
+    }
+
+    var button = document.getElementById('placeOrderButton');
+
+    try {
+
+        button.disabled = true;
+
+        button.textContent = 'Placing Order...';
+
+        var body = {
+
+            reservation_id: Number(reservationId),
+
+            items: cart.map(function (item) {
+
+                return {
+
+                    menu_item_id: item.menu_item_id,
+
+                    quantity: item.quantity
+
+                };
+
+            })
+
+        };
+
+        var result = await callApi(
+            '/orders',
+            'POST',
+            body
+        );
+
+        var order = result.data || {};
+
+        var orderId = order.order_id;
+
+        var total = order.total_amount;
+
+        // Clear cart after successful order creation.
+        cart = [];
+
+        renderCart();
+
+        // Display confirmation.
+        document.getElementById(
+            'confirmationDetails'
+        ).innerHTML =
+
+            '<p>Your order has been successfully submitted.</p>' +
+
+            '<p><strong>Order ID:</strong> #' +
+                escapeText(orderId) +
+            '</p>' +
+
+            '<p><strong>Reservation ID:</strong> #' +
+                escapeText(order.reservation_id) +
+            '</p>' +
+
+            '<p><strong>Total Amount:</strong> ' +
+                formatMoney(total) +
+            '</p>' +
+
+            '<p><strong>Status:</strong> ' +
+                escapeText(order.status || 'Pending') +
+            '</p>';
+
+        document.getElementById(
+            'orderConfirmation'
+        ).style.display = 'block';
+
+        // Refresh stock after successful ordering.
+        await loadItems();
+
+        showMessage(
+            result.message || 'Order placed successfully.',
+            false
+        );
+
+        window.scrollTo(0, document.body.scrollHeight);
+
+    } catch (error) {
+
+        showMessage(error.message, true);
+
+    } finally {
+
+        button.disabled = cart.length === 0 ||
+            reservations.length === 0;
+
+        button.textContent = 'Place Order';
+
+    }
+
+}
+
+
+// =============================================================
+// START PAGE
+// =============================================================
+
+var currentUser = startPage('menu.html');
+
+if (currentUser) {
+
+    role = currentUser.role;
+
+    if (role === 'Member') {
+
+        // Hide menu management.
+        document.getElementById('formCard').style.display =
+            'none';
+
+        // Show Member ordering sections.
+        document.getElementById('memberInfo').style.display =
+            'block';
+
+        document.getElementById('reservationCard').style.display =
+            'block';
+
+        document.getElementById('cartCard').style.display =
+            'block';
+
+        loadMemberReservations();
+
+        renderCart();
+
+    } else if (isManager()) {
+
+        // Admin and Staff retain menu management.
+        document.getElementById('formCard').style.display =
+            'block';
+
+    } else {
+
+        showMessage(
+            'You do not have permission to access this page.',
+            true
+        );
+
+    }
+
+    loadItems();
+
+}
+
 </script>
+
 </body>
-</html>
+</html> 

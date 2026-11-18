@@ -9,153 +9,301 @@
 <body>
 <div class="shell">
     <div class="sidebar" id="menu"></div>
+
     <div class="main">
         <div class="topbar">
             <h1>Study Zones</h1>
             <div class="who" id="who"></div>
         </div>
-        <div id="banner"></div>
-        <div id="content">
-<div class="card" id="formCard">
-    <h2 id="formTitle">Add a study zone</h2>
-    <div class="row">
-        <div><label>Zone name</label><input id="nameInput"></div>
-        <div><label>Type</label>
-            <select id="typeSelect">
-                <option>Open Floor</option><option>Quiet Zone</option><option>Private Room</option>
-                <option>Game Station</option><option>Solitude Wall</option>
-            </select>
-        </div>
-        <div><label>Hourly rate (pesos)</label><input id="rateInput" type="number" step="any"></div>
-        <div><label>Max hours (1-8)</label><input id="hoursInput" type="number"></div>
-        <div><label>Capacity (seats)</label><input id="capacityInput" type="number"></div>
-    </div>
-    <div style="margin-top:12px">
-        <button class="btn primary" onclick="saveZone()">Save</button>
-        <button class="btn" onclick="clearForm()">Clear</button>
-    </div>
-</div>
 
-<div class="card">
-    <h2>Zones and rates</h2>
-    <div class="tablewrap">
-        <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Rate / hour</th><th>Max hours</th><th>Capacity</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-        </table>
-    </div>
-</div>
+        <div id="banner"></div>
+
+        <div id="content">
+
+            <div class="card" id="formCard" style="display:none;">
+                <h2 id="formTitle">Add a study zone</h2>
+
+                <div class="row">
+                    <div>
+                        <label>Zone name</label>
+                        <input id="nameInput" type="text" maxlength="100">
+                    </div>
+
+                    <div>
+                        <label>Type</label>
+                        <select id="typeSelect">
+                            <option>Open Floor</option>
+                            <option>Quiet Zone</option>
+                            <option>Private Room</option>
+                            <option>Game Station</option>
+                            <option>Solitude Wall</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Hourly rate (pesos)</label>
+                        <input id="rateInput" type="number" min="0.01" step="0.01">
+                    </div>
+
+                    <div>
+                        <label>Max hours (1-8)</label>
+                        <input id="hoursInput" type="number" min="1" max="8" step="1">
+                    </div>
+
+                    <div>
+                        <label>Capacity (seats)</label>
+                        <input id="capacityInput" type="number" min="1" step="1">
+                    </div>
+                </div>
+
+                <div style="margin-top:12px">
+                    <button class="btn primary" onclick="saveZone()">Save</button>
+                    <button class="btn" onclick="clearForm()">Clear</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Zones and rates</h2>
+
+                <div class="tablewrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Rate / hour</th>
+                                <th>Max hours</th>
+                                <th>Capacity</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="rows">
+                            <tr>
+                                <td colspan="7" class="empty">Loading zones...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
 <script src="api.js"></script>
+
 <script>
 var zones = [];
 var editingId = null;
 var isAdmin = false;
 
+// Load all study zones.
 async function loadZones() {
     try {
         showLoading();
+
         var result = await callApi('/study-zones');
-        zones = result.data;
+
+        if (!result || result.success !== true) {
+            throw new Error(
+                result && result.error
+                    ? result.error.message
+                    : 'Unable to retrieve study zones.'
+            );
+        }
+
+        zones = Array.isArray(result.data) ? result.data : [];
 
         var html = '';
+
         for (var i = 0; i < zones.length; i++) {
             var z = zones[i];
             var buttons = '';
+
             if (isAdmin) {
-                buttons = '<button class="btn small" onclick="editZone(' + z.zone_id + ')">Edit</button> ' +
-                          '<button class="btn small danger" onclick="deleteZone(' + z.zone_id + ')">Delete</button>';
+                buttons =
+                    '<button class="btn small" onclick="editZone(' +
+                    z.zone_id + ')">Edit</button> ' +
+
+                    '<button class="btn small danger" onclick="deleteZone(' +
+                    z.zone_id + ')">Delete</button>';
             }
-            html = html + '<tr>' +
-                '<td>' + z.zone_id + '</td>' +
-                '<td>' + escapeHtml(z.name) + '</td>' +
-                '<td>' + escapeHtml(z.type) + '</td>' +
-                '<td>' + formatMoney(z.hourly_rate) + '</td>' +
-                '<td>' + z.max_hours + '</td>' +
-                '<td>' + z.capacity + '</td>' +
-                '<td class="actions">' + buttons + '</td></tr>';
+
+            html +=
+                '<tr>' +
+                    '<td>' + z.zone_id + '</td>' +
+                    '<td>' + escapeHtml(z.name) + '</td>' +
+                    '<td>' + escapeHtml(z.type) + '</td>' +
+                    '<td>' + formatMoney(z.hourly_rate) + '</td>' +
+                    '<td>' + z.max_hours + '</td>' +
+                    '<td>' + z.capacity + '</td>' +
+                    '<td class="actions">' + buttons + '</td>' +
+                '</tr>';
         }
+
         if (zones.length === 0) {
             html = '<tr><td colspan="7" class="empty">No zones found.</td></tr>';
         }
+
         document.getElementById('rows').innerHTML = html;
+
         hideBanner();
+
     } catch (error) {
         showError(error.message);
     }
 }
 
+// Clear the form and reset its values.
 function clearForm() {
     editingId = null;
+
     document.getElementById('formTitle').textContent = 'Add a study zone';
+
     document.getElementById('nameInput').value = '';
+    document.getElementById('typeSelect').selectedIndex = 0;
     document.getElementById('rateInput').value = '';
     document.getElementById('hoursInput').value = '';
     document.getElementById('capacityInput').value = '';
 }
 
+// Load an existing zone into the form.
 function editZone(id) {
     var z = findById(zones, 'zone_id', id);
+
+    if (!z) {
+        showError('Study zone not found.');
+        return;
+    }
+
     editingId = id;
-    document.getElementById('formTitle').textContent = 'Edit study zone #' + id;
+
+    document.getElementById('formTitle').textContent =
+        'Edit study zone #' + id;
+
     document.getElementById('nameInput').value = z.name;
     document.getElementById('typeSelect').value = z.type;
     document.getElementById('rateInput').value = z.hourly_rate;
     document.getElementById('hoursInput').value = z.max_hours;
     document.getElementById('capacityInput').value = z.capacity;
+
     window.scrollTo(0, 0);
 }
 
+// Validate and save a study zone.
 async function saveZone() {
     try {
         var body = {
-            name: document.getElementById('nameInput').value,
+            name: document.getElementById('nameInput').value.trim(),
             type: document.getElementById('typeSelect').value,
             hourly_rate: document.getElementById('rateInput').value,
             max_hours: document.getElementById('hoursInput').value,
             capacity: document.getElementById('capacityInput').value
         };
 
+        if (!body.name) {
+            throw new Error('Zone name is required.');
+        }
+
+        var rate = Number(body.hourly_rate);
+
+        if (
+            body.hourly_rate === '' ||
+            !Number.isFinite(rate) ||
+            rate <= 0
+        ) {
+            throw new Error('Hourly rate must be above 0.');
+        }
+
+        var hours = Number(body.max_hours);
+
+        if (
+            body.max_hours === '' ||
+            !Number.isInteger(hours) ||
+            hours < 1 ||
+            hours > 8
+        ) {
+            throw new Error('Maximum hours must be a whole number from 1 to 8.');
+        }
+
+        var capacity = Number(body.capacity);
+
+        if (
+            body.capacity === '' ||
+            !Number.isInteger(capacity) ||
+            capacity < 1
+        ) {
+            throw new Error('Capacity must be a whole number of at least 1.');
+        }
+
         var result;
+
         if (editingId === null) {
             result = await callApi('/study-zones', 'POST', body);
         } else {
             result = await callApi('/study-zones/' + editingId, 'PUT', body);
         }
 
+        if (!result || result.success !== true) {
+            throw new Error(
+                result && result.error
+                    ? result.error.message
+                    : 'Unable to save study zone.'
+            );
+        }
+
         showMessage(result.message, false);
+
         clearForm();
-        loadZones();
+
+        await loadZones();
+
     } catch (error) {
         showMessage(error.message, true);
     }
 }
 
+// Delete a study zone.
 async function deleteZone(id) {
-    if (confirm('Delete this study zone?') === false) {
+    if (confirm('Are you sure you want to delete this study zone?') === false) {
         return;
     }
+
     try {
         var result = await callApi('/study-zones/' + id, 'DELETE');
+
+        if (!result || result.success !== true) {
+            throw new Error(
+                result && result.error
+                    ? result.error.message
+                    : 'Unable to delete study zone.'
+            );
+        }
+
         showMessage(result.message, false);
-        loadZones();
+
+        await loadZones();
+
     } catch (error) {
         showMessage(error.message, true);
     }
 }
 
-// ---- start the page ----
+// Initialize the page.
 var currentUser = startPage('zones.html');
+
 if (currentUser) {
-    isAdmin = (currentUser.role === 'Admin');
-    if (isAdmin === false) {
-        document.getElementById('formCard').style.display = 'none';   // only Admin can add or edit
+    isAdmin = currentUser.role === 'Admin';
+
+    if (isAdmin) {
+        document.getElementById('formCard').style.display = 'block';
     }
+
     loadZones();
 }
 </script>
+
 </body>
 </html>
