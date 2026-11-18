@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Entry - Study Cafe</title>
+    <link rel="stylesheet" href="app.css">
+
+    <style>
+        .order-item-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 12px;
+        }
+
+        .order-item-row .field {
+            margin-bottom: 0;
+        }
+
+        .order-item-row label {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .order-item-row input,
+        .order-item-row select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .order-total {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 18px 0;
+        }
+
+        .details-card {
+            margin-top: 20px;
+        }
+
+        .details-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .details-info p {
+            margin: 0;
+        }
+
+        .status-text {
+            margin: 12px 0;
+        }
+
+        @media (max-width: 650px) {
+            .order-item-row {
+                grid-template-columns: 1fr;
+            }
+
+            .details-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="shell">
+
+    <aside class="sidebar" id="menu"></aside>
+
+    <main class="main">
+
+        <header class="topbar">
+            <h1>Order Entry</h1>
+            <div class="who" id="who"></div>
+        </header>
+
+        <div id="banner"></div>
+
+        <section id="content">
+
+            <!-- CREATE ORDER -->
+            <div class="card">
+
+                <div class="toolbar">
+                    <div>
+                        <h2>Create New Order</h2>
+                        <p>Select a reservation and add menu items.</p>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="reservationId">Reservation ID</label>
+                    <input
+                        type="number"
+                        id="reservationId"
+                        min="1"
+                        placeholder="Enter reservation ID"
+                    >
+                </div>
+
+                <h3>Order Items</h3>
+
+                <div id="orderItems"></div>
+
+                <div class="actions">
+                    <button type="button" class="btn" id="addItemButton">
+                        + Add Item
+                    </button>
+
+                    <button type="button" class="btn primary" id="createOrderButton">
+                        Create Order
+                    </button>
+                </div>
+
+                <div id="pageMessage" class="status-text"></div>
+
+            </div>
+
+            <!-- ORDERS TABLE -->
+            <div class="card">
+
+                <div class="toolbar">
+                    <div>
+                        <h2>Orders</h2>
+                        <p>View and manage customer orders and food payments.</p>
+                    </div>
+
+                    <button type="button" class="btn" id="refreshOrdersButton">
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="tablewrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Reservation ID</th>
+                                <th>Member</th>
+                                <th>Total Amount</th>
+                                <th>Order Status</th>
+                                <th>Payment Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="ordersTableBody">
+                            <tr>
+                                <td colspan="8" class="empty">Loading orders...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- ORDER DETAILS -->
+            <div class="card details-card" id="orderDetails" style="display:none;">
+
+                <div class="toolbar">
+                    <div>
+                        <h2>Order Details</h2>
+                        <p>Information about the selected order.</p>
+                    </div>
+
+                    <button type="button" class="btn" id="closeDetailsButton">
+                        Close
+                    </button>
+                </div>
+
+                <div id="orderDetailsContent"></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<script src="api.js"></script>
+
+<script>
+    // Initialize the shared sidebar, authentication, and page layout.
+    startPage('orders.html');
+
+    const orderItemsContainer = document.getElementById('orderItems');
+    const ordersTableBody = document.getElementById('ordersTableBody');
+    const pageMessage = document.getElementById('pageMessage');
+    const orderDetails = document.getElementById('orderDetails');
+    const orderDetailsContent = document.getElementById('orderDetailsContent');
+
+    let menuItems = [];
+
+    // Safely escape displayed text.
+    function safeText(value) {
+        return escapeHtml(String(value ?? ''));
+    }
+
+    // Format currency.
+    function displayMoney(value) {
+        const amount = Number(value);
+
+        if (!Number.isFinite(amount)) {
+            return '₱0.00';
+        }
+
+        return '₱' + amount.toFixed(2);
+    }
+
+    // Format date and time.
+    function displayDateTime(value) {
+        if (!value) {
+            return '-';
+        }
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return safeText(value);
+        }
+
+        return date.toLocaleString();
+    }
+
+    // Show a message on the page.
+    function showPageMessage(message, type) {
+        pageMessage.textContent = message;
+
+        if (type === 'error') {
+            pageMessage.style.color = '#b42318';
+        } else {
+            pageMessage.style.color = '#16803c';
+        }
+    }
+
+    function clearPageMessage() {
+        pageMessage.textContent = '';
+    }
+
+    // API helper.
+    async function requestApi(endpoint, options) {
+        options = options || {};
+
+        const method = options.method || 'GET';
+        const body = options.body;
+
+        const result = await callApi(endpoint, method, body);
+
+        if (!result || result.success !== true) {
+            const message =
+                result &&
+                result.error &&
+                result.error.message
+                    ? result.error.message
+                    : 'The request could not be completed.';
+
+            throw new Error(message);
+        }
+
+        return result;
+    }
+
+    // Load available menu items.
+    async function loadMenuItems() {
+        const result = await requestApi('/menu-items');
+
+        menuItems = Array.isArray(result.data)
+            ? result.data
+            : [];
+    }
+
+    // Add an item row to the order form.
+    function addOrderItemRow() {
+        const row = document.createElement('div');
+        row.className = 'order-item-row';
+
+        const options = menuItems.map(function (item) {
+            return `
+                <option value="${Number(item.item_id)}">
+                    ${safeText(item.name)} - ${displayMoney(item.price)}
+                    (Stock: ${Number(item.stock)})
+                </option>
+            `;
+        }).join('');
+
+        row.innerHTML = `
+            <div class="field">
+                <label>Menu Item</label>
+                <select class="menu-item-select">
+                    <option value="">Select menu item</option>
+                    ${options}
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Quantity</label>
+                <input
+                    type="number"
+                    class="quantity-input"
+                    min="1"
+                    step="1"
+                    value="1"
+                >
+            </div>
+
+            <button type="button" class="btn danger remove-item-button">
+                Remove
+            </button>
+        `;
+
+        row.querySelector('.remove-item-button')
+            .addEventListener('click', function () {
+                row.remove();
+            });
+
+        orderItemsContainer.appendChild(row);
+    }
+
+    // Validate and collect order items.
+    function collectOrderItems() {
+        const rows = orderItemsContainer.querySelectorAll('.order-item-row');
+
+        if (rows.length === 0) {
+            throw new Error('Please add at least one order item.');
+        }
+
+        const items = [];
+
+        for (const row of rows) {
+            const itemId = Number(
+                row.querySelector('.menu-item-select').value
+            );
+
+            const quantity = Number(
+                row.querySelector('.quantity-input').value
+            );
+
+            if (!Number.isInteger(itemId) || itemId <= 0) {
+                throw new Error('Please select a menu item for every row.');
+            }
+
+            if (!Number.isInteger(quantity) || quantity <= 0) {
+                throw new Error('Quantity must be a positive whole number.');
+            }
+
+            items.push({
+                menu_item_id: itemId,
+                quantity: quantity
+            });
+        }
+
+        return items;
+    }
+
+    // Create a new order.
+    async function createOrder() {
+        clearPageMessage();
+
+        try {
+            const reservationId = Number(
+                document.getElementById('reservationId').value
+            );
+
+            if (!Number.isInteger(reservationId) || reservationId <= 0) {
+                throw new Error('Please enter a valid reservation ID.');
+            }
+
+            const items = collectOrderItems();
+
+            const result = await requestApi('/orders', {
+                method: 'POST',
+                body: {
+                    reservation_id: reservationId,
+                    items: items
+                }
+            });
+
+            showPageMessage(
+                result.message || 'Order created successfully.',
+                'success'
+            );
+
+            document.getElementById('reservationId').value = '';
+            orderItemsContainer.innerHTML = '';
+
+            addOrderItemRow();
+
+            await loadMenuItems();
+            await loadOrders();
+
+        } catch (error) {
+            showPageMessage(error.message, 'error');
+        }
+    }
+
+    // Return an order status badge.
+    function statusBadge(status) {
+        if (status === 'Pending') {
+            return '<span class="badge b-yellow">Pending</span>';
+        }
+
+        if (status === 'Served') {
+            return '<span class="badge b-green">Served</span>';
+        }
+
+        if (status === 'Cancelled') {
+            return '<span class="badge b-red">Cancelled</span>';
+        }
+
+        return '<span class="badge">' + safeText(status) + '</span>';
+    }
+
+    // Return a payment status badge.
+    function paymentStatusBadge(status) {
+        if (status === 'Paid') {
+            return '<span class="badge b-green">Paid</span>';
+        }
+
+        if (status === 'Unpaid') {
+            return '<span class="badge b-yellow">Unpaid</span>';
+        }
+
+        return '<span class="badge">' + safeText(status || '-') + '</span>';
+    }
+
+    // Load all orders.
+    async function loadOrders() {
+        ordersTableBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="empty">Loading orders...</td>
+            </tr>
+        `;
+
+        try {
+            const result = await requestApi('/orders');
+
+            const orders = Array.isArray(result.data)
+                ? result.data
+                : [];
+
+            if (orders.length === 0) {
+                ordersTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty">No orders found.</td>
+                    </tr>
+                `;
+
+                return;
+            }
+
+            ordersTableBody.innerHTML = orders.map(function (order) {
+                const orderId = Number(order.order_id);
+                const status = String(order.status || '');
+                const paymentStatus = String(order.payment_status || 'Unpaid');
+
+                let actions = `
+                    <button
+                        type="button"
+                        class="btn small view-order-button"
+                        data-id="${orderId}"
+                    >
+                        View
+                    </button>
+                `;
+
+                // Only Pending orders can be served or cancelled.
+                if (status === 'Pending') {
+                    actions += `
+                        <button
+                            type="button"
+                            class="btn small primary serve-order-button"
+                            data-id="${orderId}"
+                        >
+                            Serve
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn small danger cancel-order-button"
+                            data-id="${orderId}"
+                        >
+                            Cancel
+                        </button>
+                    `;
+                }
+
+                // Only Served and Unpaid orders can be marked as Paid.
+                if (
+                    status === 'Served' &&
+                    paymentStatus === 'Unpaid'
+                ) {
+                    actions += `
+                        <button
+                            type="button"
+                            class="btn small primary mark-paid-button"
+                            data-id="${orderId}"
+                        >
+                            Mark as Paid
+                        </button>
+                    `;
+                }
+
+                return `
+                    <tr>
+                        <td>#${orderId}</td>
+                        <td>${safeText(order.reservation_id)}</td>
+                        <td>${safeText(order.member_name || '-')}</td>
+                        <td>${displayMoney(order.total_amount)}</td>
+                        <td>${statusBadge(status)}</td>
+                        <td>${paymentStatusBadge(paymentStatus)}</td>
+                        <td>${displayDateTime(order.created_at)}</td>
+                        <td>
+                            <div class="actions">
+                                ${actions}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (error) {
+            ordersTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="empty">
+                        ${safeText(error.message)}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // View a selected order.
+    async function viewOrder(orderId) {
+        clearPageMessage();
+
+        try {
+            const result = await requestApi('/orders/' + orderId);
+            const order = result.data;
+
+            if (!order) {
+                throw new Error('Order details could not be found.');
+            }
+
+            const items = Array.isArray(order.items)
+                ? order.items
+                : [];
+
+            let itemRows = '';
+
+            if (items.length > 0) {
+                itemRows = items.map(function (item) {
+                    return `
+                        <tr>
+                            <td>${safeText(item.menu_item_name || item.name || '-')}</td>
+                            <td>${safeText(item.quantity)}</td>
+                            <td>${displayMoney(item.unit_price)}</td>
+                            <td>${displayMoney(item.subtotal)}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                itemRows = `
+                    <tr>
+                        <td colspan="4" class="empty">
+                            No order items found.
+                        </td>
+                    </tr>
+                `;
+            }
+
+            const paymentStatus = order.payment_status || 'Unpaid';
+
+            orderDetailsContent.innerHTML = `
+                <div class="details-info">
+                    <p><strong>Order ID:</strong> #${safeText(order.order_id)}</p>
+                    <p><strong>Reservation ID:</strong> ${safeText(order.reservation_id)}</p>
+                    <p><strong>Order Status:</strong> ${statusBadge(order.status)}</p>
+                    <p><strong>Payment Status:</strong> ${paymentStatusBadge(paymentStatus)}</p>
+                    <p><strong>Total Amount:</strong> ${displayMoney(order.total_amount)}</p>
+                    <p><strong>Created At:</strong> ${displayDateTime(order.created_at)}</p>
+                </div>
+
+                <h3>Items Ordered</h3>
+
+                <div class="tablewrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Menu Item</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            ${itemRows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            orderDetails.style.display = 'block';
+
+            orderDetails.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+        } catch (error) {
+            showPageMessage(error.message, 'error');
+        }
+    }
+
+    // Update order status.
+    async function updateOrderStatus(orderId, status) {
+        clearPageMessage();
+
+        const confirmation = status === 'Cancelled'
+            ? 'Are you sure you want to cancel this order?'
+            : 'Mark this order as served?';
+
+        if (!window.confirm(confirmation)) {
+            return;
+        }
+
+        try {
+            const result = await requestApi(
+                '/orders/' + orderId + '/status',
+                {
+                    method: 'PATCH',
+                    body: {
+                        status: status
+                    }
+                }
+            );
+
+            showPageMessage(
+                result.message || 'Order status updated successfully.',
+                'success'
+            );
+
+            await loadMenuItems();
+            await loadOrders();
+
+        } catch (error) {
+            showPageMessage(error.message, 'error');
+        }
+    }
+
+    // Confirm food order payment.
+    async function markOrderAsPaid(orderId) {
+        clearPageMessage();
+
+        const confirmation = window.confirm(
+            'Confirm that the customer has paid the full food order amount of this order?'
+        );
+
+        if (!confirmation) {
+            return;
+        }
+
+        try {
+            const result = await requestApi(
+                '/orders/' + orderId + '/payment',
+                {
+                    method: 'PATCH'
+                }
+            );
+
+            showPageMessage(
+                result.message || 'Food order payment confirmed successfully.',
+                'success'
+            );
+
+            await loadOrders();
+
+            // Refresh the details if the selected order is currently open.
+            if (orderDetails.style.display !== 'none') {
+                await viewOrder(orderId);
+            }
+
+        } catch (error) {
+            showPageMessage(error.message, 'error');
+        }
+    }
+
+    // Handle order table buttons.
+    ordersTableBody.addEventListener('click', function (event) {
+        const button = event.target.closest('button');
+
+        if (!button) {
+            return;
+        }
+
+        const orderId = Number(button.dataset.id);
+
+        if (!Number.isInteger(orderId) || orderId <= 0) {
+            return;
+        }
+
+        if (button.classList.contains('view-order-button')) {
+            viewOrder(orderId);
+            return;
+        }
+
+        if (button.classList.contains('serve-order-button')) {
+            updateOrderStatus(orderId, 'Served');
+            return;
+        }
+
+        if (button.classList.contains('cancel-order-button')) {
+            updateOrderStatus(orderId, 'Cancelled');
+            return;
+        }
+
+        if (button.classList.contains('mark-paid-button')) {
+            markOrderAsPaid(orderId);
+        }
+    });
+
+    // Event listeners.
+    document.getElementById('addItemButton')
+        .addEventListener('click', addOrderItemRow);
+
+    document.getElementById('createOrderButton')
+        .addEventListener('click', createOrder);
+
+    document.getElementById('refreshOrdersButton')
+        .addEventListener('click', function () {
+            clearPageMessage();
+            loadOrders();
+        });
+
+    document.getElementById('closeDetailsButton')
+        .addEventListener('click', function () {
+            orderDetails.style.display = 'none';
+        });
+
+    // Initialize the page.
+    async function initializeOrdersPage() {
+        try {
+            await loadMenuItems();
+
+            addOrderItemRow();
+
+            await loadOrders();
+
+        } catch (error) {
+            showPageMessage(error.message, 'error');
+
+            ordersTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="empty">
+                        ${safeText(error.message)}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    initializeOrdersPage();
+
+</script>
+
+</body>
+</html>
